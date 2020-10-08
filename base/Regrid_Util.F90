@@ -24,6 +24,7 @@
    use MAPL_ExceptionHandling
    use MAPL_ApplicationSupport
    use pFIO
+   use gFTL_StringVector
 
  
    implicit NONE
@@ -75,13 +76,13 @@ CONTAINS
    type(ESMF_TimeInterval) :: timeInterval
    type(ESMF_Clock) :: clock
 
-   logical :: fileCreated
+   logical :: fileCreated,bundlecreated
 
    character(len=ESMF_MAXSTR) :: RegridMth
 
    character(len=ESMF_MAXSTR) :: Iam
 
-   integer :: second,minute,hour,day,month,year,itime(2),begDate,begTime,tsteps,i,nymdB, nhmsB,freq
+   integer :: second,minute,hour,day,month,year,itime(2),begDate,begTime,tsteps,i,nymdB, nhmsB,freq,n
 
    character(len=2) :: pole_new,dateline_new
    character(len=2) :: pole_old,dateline_old
@@ -97,6 +98,7 @@ CONTAINS
    integer :: regridMethod
    real :: cs_stretch_param(3)
    integer :: shave, zip
+   type(StringVector) :: file_list,out_file_list
  
     Iam = "ut_ReGridding"
 
@@ -167,7 +169,6 @@ CONTAINS
       case('-deflate')
          call get_command_argument(i+1,astr)
          read(astr,*)zip
-         write(*,*)'bmaa zip ',zip
       case('--help')
          if (mapl_am_I_root()) then
          
@@ -176,6 +177,12 @@ CONTAINS
          return
       end select
     enddo
+
+    file_list = create_file_list(filename,rc=status)
+    _VERIFY(status)
+    out_file_list = create_file_list(outputfile,rc=status)
+    _VERIFY(status)
+    _ASSERT(file_list%size()==out_file_list%size(),'INPUT  and OUTPUT file lists are not the same')
 
     if (trim(regridMth) .ne. 'bilinear' .and. trim(regridMth ) .ne. 'conservative' .and. trim(regridMth ) .ne. 'conservative2' .and. &
          trim(regridMth).ne.'patch') then
@@ -200,10 +207,7 @@ CONTAINS
 
     call ESMF_CalendarSetDefault ( ESMF_CALKIND_GREGORIAN, rc=status )
     _VERIFY(STATUS)
-    if (.not.allTimes) then
-       call UnpackDateTIme(itime,year,month,day,hour,minute,second)
-    end if
-    call ESMF_CFIOSet(lcfio,fname=trim(filename),__RC__)
+    call ESMF_CFIOSet(lcfio,fname=trim(file_list%at(1)),__RC__)
     call ESMF_CFIOFileOpen(lcfio,FMODE=1,__RC__)
     call ESMF_CFIOGet       (LCFIO,     grid=CFIOGRID, __RC__)
     call ESMF_CFIOGridGet   (CFIOGRID, IM=IM_WORLD0, JM=JM_WORLD0, KM=LM_WORLD, Lon=lonsfile,lat=latsfile, __RC__)
@@ -261,57 +265,86 @@ CONTAINS
     call ESMF_FieldBundleSet(bundle_cfio,grid=grid_old,rc=status)
     _VERIFY(STATUS)
 
-    fileCreated=.false.
-    do i=1,tsteps
+    bundlecreated=.false.
+    do n=1,out_file_list%size()
+       fileCreated=.false.
 
-       
-       call t_prof%start("Read")
-       if (mapl_am_i_root()) write(*,*)'processing timestep ',i
-       time = tSeries(i)
-       if (onlyvars) then
-          call MAPL_CFIORead(filename,time,bundle_cfio,only_vars=vars,rc=status)
-       else
-          call MAPL_CFIORead(filename,time,bundle_cfio,rc=status)
-       end if
-       _VERIFY(STATUS)
+       call ESMF_CFIOSet(lcfio,fname=trim(file_list%at(n)),__RC__)
+       call ESMF_CFIOFileOpen(lcfio,FMODE=1,__RC__)
+       tSteps=lcfio%tSteps
+       if (allocated(tSeriesInt)) deallocate(tSeriesInt)
+       allocate(tSeriesInt(tSteps))
+       call getDateTimeVec(lcfio%fid,begDate,begTime,tSeriesInt,__RC__)
+       if (allocated(tSeries)) deallocate(tSeries)
+       allocate(tSeries(tSteps))
+       call getDateTimeVec(lcfio%fid,begDate,begTime,tSeriesInt,__RC__)
+       do i=1,tSteps
+           iCurrInterval = tSeriesInt(i)
+           call GetDate ( begDate, begTime, iCurrInterval, nymdB, nhmsB, status )
+           call MAPL_UnpackTime(nymdB,year,month,day)
+           call MAPL_UnpackTime(nhmsB,hour,minute,second)
+           call ESMF_TimeSet(tSeries(i), yy=year, mm=month, dd=day,  h=hour,  m=minute, s=second,__RC__)
+       enddo
+       icurrInterval = tSeriesInt(1)
+       call GetDate ( begDate, begTime, iCurrInterval, nymdB, nhmsB, status )
+       call MAPL_UnpackTime(nymdB,year,month,day)
+       call MAPL_UnpackTime(nhmsB,hour,minute,second)
+       call ESMF_CFIOFileClose(lcfio)
 
-       if (Mapl_AM_I_Root()) write(*,*)'done reading file ',trim(filename)
-
-       if (.not.fileCreated) bundle_esmf = BundleClone(bundle_cfio,grid_new,__RC__)
-       call t_prof%stop("Read")
-
-       call MPI_BARRIER(MPI_COMM_WORLD,STATUS)
-       _VERIFY(STATUS)
-       _VERIFY(STATUS)
-
-       call t_prof%start("regrid")
-       call RunESMFRegridding(bundle_cfio,bundle_esmf,shave,__RC__)
-       call t_prof%stop("regrid")
-
-       call MPI_BARRIER(MPI_COMM_WORLD,STATUS)
-       _VERIFY(STATUS)
- 
-       call t_prof%start("write")
-
-
-       if (mapl_am_I_root()) write(*,*) "moving on to writing the file"
-
-       call ESMF_ClockSet(clock,currtime=time,__RC__)
-       if (.not.fileCreated) then
-          call ESMF_TimeIntervalGet(timeInterval,s=freq,__RC__)
-          call MAPL_CFIOCreate ( cfio_esmf, outputFile, clock, Bundle_esmf,frequency=freq,vunit = "layer", deflate=zip, rc=status )
+       do i=1,tsteps
+          
+          call t_prof%start("Read")
+          if (mapl_am_i_root()) write(*,*)'processing timestep ',i
+          time = tSeries(i)
+          if (onlyvars) then
+             call MAPL_CFIORead(file_list%at(n),time,bundle_cfio,only_vars=vars,rc=status)
+          else
+             call MAPL_CFIORead(file_list%at(n),time,bundle_cfio,rc=status)
+          end if
           _VERIFY(STATUS)
-          call MAPL_CFIOSet(cfio_esmf,newFormat=newCube,rc=status)
+
+          if (Mapl_AM_I_Root()) write(*,*)'done reading file ',trim(file_list%at(1))
+
+          if (.not.bundlecreated) then 
+             bundle_esmf = BundleClone(bundle_cfio,grid_new,__RC__)
+             bundlecreated = .true.
+          end if
+          call t_prof%stop("Read")
+
+          call MPI_BARRIER(MPI_COMM_WORLD,STATUS)
           _VERIFY(STATUS)
-       end if
-       call MAPL_CFIOWrite(cfio_esmf,clock,bundle_esmf,created=fileCreated,rc=status)
+          _VERIFY(STATUS)
+
+          call t_prof%start("regrid")
+          call RunESMFRegridding(bundle_cfio,bundle_esmf,shave,__RC__)
+          call t_prof%stop("regrid")
+
+          call MPI_BARRIER(MPI_COMM_WORLD,STATUS)
+          _VERIFY(STATUS)
+    
+          call t_prof%start("write")
+
+
+          if (mapl_am_I_root()) write(*,*) "moving on to writing the file"
+
+          call ESMF_ClockSet(clock,currtime=time,__RC__)
+          if (.not.fileCreated) then
+             call ESMF_TimeIntervalGet(timeInterval,s=freq,__RC__)
+             call MAPL_CFIOCreate ( cfio_esmf, out_file_list%at(n), clock, Bundle_esmf,frequency=freq,vunit = "layer", deflate=zip, rc=status )
+             _VERIFY(STATUS)
+             call MAPL_CFIOSet(cfio_esmf,newFormat=newCube,rc=status)
+             _VERIFY(STATUS)
+          end if
+          call MAPL_CFIOWrite(cfio_esmf,clock,bundle_esmf,created=fileCreated,rc=status)
+          _VERIFY(STATUS)
+          if (.not.fileCreated) fileCreated=.true.
+          call t_prof%stop("write")
+    
+       end do
+       call MAPL_CFIOClose(cfio_esmf,rc=status)
        _VERIFY(STATUS)
-       if (.not.fileCreated) fileCreated=.true.
-       call t_prof%stop("write")
- 
+       filecreated=.false.
     end do
-    call MAPL_CFIOClose(cfio_esmf,rc=status)
-    _VERIFY(STATUS)
 
 !   All done
 !   --------
@@ -625,7 +658,9 @@ CONTAINS
 
          character(:), allocatable :: report_lines(:)
          integer :: i
-   
+         character(1) :: empty(0)
+  
+         reporter = ProfileReporter(empty) 
          call reporter%add_column(NameColumn(20))
          call reporter%add_column(FormattedTextColumn('Inclusive','(f9.6)', 9, InclusiveColumn('MEAN')))
          call reporter%add_column(FormattedTextColumn('% Incl','(f6.2)', 6, PercentageColumn(InclusiveColumn('MEAN'),'MAX')))
@@ -645,5 +680,27 @@ CONTAINS
             write(*,'(a)') ''
          end if
     end subroutine generate_report
+
+    function create_file_list(filename,rc) result(file_list)
+       character(len=*), intent(in) :: filename
+       integer, intent(inout), optional :: rc
+
+       integer :: funit
+       type(StringVector) :: file_list
+       character(len=ESMF_MAXPATHLEN) :: filen
+
+       if (index(filename,"@")==1) then
+          open(file=trim(filename),newunit=funit)
+          do while(.true.)
+             read(funit,*,end=987)filen
+             call file_list%push_back(trim(filen))
+          enddo
+ 987      continue
+       else
+          call file_list%push_back(filename)
+       end if
+       _RETURN(_SUCCESS)
+
+   end function create_file_list
  
     end program ut_ReGridding 
