@@ -13,7 +13,6 @@ module MAPL_CapMod
    use MAPL_BaseMod
    use MAPL_ExceptionHandling
    use pFIO
-   use MAPL_ioClientsMod
    use MAPL_CapOptionsMod
    use MAPL_ServerManager
    use MAPL_ApplicationSupport
@@ -44,6 +43,7 @@ module MAPL_CapMod
       procedure :: run_member
       procedure :: run_model
       procedure :: step_model
+      procedure :: rewind_model
 
       procedure :: create_member_subcommunicator
       procedure :: initialize_io_clients_servers
@@ -170,7 +170,6 @@ contains
      class (MAPL_Cap), target, intent(inout) :: this
      class (KeywordEnforcer), optional, intent(in) :: unusable
      integer, optional, intent(out) :: rc
-     integer :: status
 
      _UNUSED_DUMMY(unusable)
      call this%cap_server%finalize()
@@ -192,6 +191,8 @@ contains
          nodes_output_server=this%cap_options%nodes_output_server, &
          npes_input_server=this%cap_options%npes_input_server, &
          npes_output_server=this%cap_options%npes_output_server, &
+         oserver_type=this%cap_options%oserver_type, &
+         npes_output_backend=this%cap_options%npes_output_backend, &
          rc=status)
      _VERIFY(status)
 
@@ -416,7 +417,14 @@ contains
      integer :: status
      call this%cap_gc%step(rc = status); _VERIFY(status)
    end subroutine step_model
-   
+  
+   subroutine rewind_model(this, time, rc)
+     class(MAPL_Cap), intent(inout) :: this
+     type(ESMF_Time), intent(inout) :: time
+     integer, intent(out) :: rc
+     integer :: status
+     call this%cap_gc%rewind_clock(time,rc = status); _VERIFY(status)
+   end subroutine rewind_model 
 
    integer function create_member_subcommunicator(this, comm, unusable, rc) result(subcommunicator)
       class (MAPL_Cap), intent(in) :: this
@@ -505,7 +513,7 @@ contains
       class (KeywordEnforcer), optional, intent(in) :: unusable
       integer, optional, intent(out) :: rc
 
-      integer :: ierror, local_comm_world
+      integer :: ierror
       _UNUSED_DUMMY(unusable)
 
       if (.not. this%mpi_already_initialized) then
