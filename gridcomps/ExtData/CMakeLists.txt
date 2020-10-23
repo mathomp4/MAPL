@@ -12,8 +12,9 @@ set (srcs
      ExtDataBracket.F90
      ExtDataUpdatePointer.F90
      ExtDataAbstractFileHandler.F90
-     ExtDataSimpleFileHandler.F90
      ExtDataClimFileHandler.F90
+     ExtDataSimpleFileHandler.F90
+     ExtDataNode.F90
     )
 
 esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.shared MAPL.base)

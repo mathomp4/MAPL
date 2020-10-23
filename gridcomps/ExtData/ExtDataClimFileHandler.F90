@@ -13,6 +13,7 @@ module MAPL_ExtdataClimFileHandler
    use MAPL_FileMetadataUtilsMod
    use MAPL_TimeStringConversion
    use MAPL_StringTemplate
+   use MAPL_ExtDataBracket
    implicit none
    private
    public ExtDataClimFileHandler
@@ -27,21 +28,27 @@ module MAPL_ExtdataClimFileHandler
 
 contains
 
-   subroutine get_file_bracket(this, input_time, bracketside, source_time, output_file, time_index, output_time, rc)
+   subroutine get_file_bracket(this, input_time, source_time, bracket, rc)
       class(ExtdataClimFileHandler), intent(inout) :: this
-      type(ESMF_Time), intent(inout) :: input_time
-      character(len=*), intent(in) :: bracketside
+      type(ESMF_Time), intent(in) :: input_time
       integer, intent(in) :: source_time(:)
-      character(len=*), intent(inout) :: output_file
-      integer, intent(out) :: time_index
-      type(ESMF_Time), intent(out) :: output_time
+      type(ExtDataBracket), intent(inout) :: bracket
       integer, optional, intent(out) :: rc
+
+      type(ESMF_Time) :: time
+      integer :: time_index
+      character(len=ESMF_MAXPATHLEN) :: file
       integer :: status
       type(ESMF_TimeInterval) :: zero
       type(ESMF_Time) :: target_time
 
       integer :: target_year, original_year,clim_shift
      
+      
+      if (bracket%time_in_bracket(input_time)) then
+         _RETURN(_SUCCESS)
+      end if
+
       target_time=input_time
       _ASSERT(size(this%valid_range) == 2, 'Valid time is not defined so can not do any extrapolation or climatology')
       if (size(source_time)==2) then
@@ -82,20 +89,41 @@ contains
 
          call ESMF_TimeIntervalSet(zero,__RC__)      
          if (this%frequency == zero) then
-            output_file = this%file_template
-            call this%get_time_on_file(output_file,target_time,bracketside,time_index,output_time,__RC__)
-         else
-            call this%get_file(output_file,target_time,0,__RC__)
-            call this%get_time_on_file(output_file,target_time,bracketside,time_index,output_time,rc=status)
-            if (status /=  _SUCCESS) then
-               if ( bracketside == 'R') then
-                  call this%get_file(output_file,target_time,1,__RC__)
-                  call this%get_time_on_file(output_file,target_time,bracketside,time_index,output_time,__RC__)
-               else if (bracketside == 'L') then 
-                  call this%get_file(output_file,target_time,-1,__RC__)
-                  call this%get_time_on_file(output_file,target_time,bracketside,time_index,output_time,__RC__)
-               end if
+            file = this%file_template
+            call this%get_time_on_file(file,input_time,'L',time_index,time,__RC__)
+            call bracket%set_node('L',file=file,time_index=time_index,time=time,__RC__)
+            if (bracket%left_node == bracket%right_node) then
+               call bracket%swap_node_fields(rc=status)
+               _VERIFY(status)
+            else
+               bracket%new_file_left=.true.
             end if
+            call this%get_time_on_file(file,input_time,'R',time_index,time,__RC__)
+            call bracket%set_node('R',file=file,time_index=time_index,time=time,__RC__)
+            bracket%new_file_right=.true.
+         else
+            call this%get_file(file,target_time,0,__RC__)
+            call this%get_time_on_file(file,target_time,'L',time_index,time,rc=status)
+            if (status /=  _SUCCESS) then
+               call this%get_file(file,target_time,-1,__RC__)
+               call this%get_time_on_file(file,target_time,'L',time_index,time,__RC__)
+            end if
+            call bracket%set_node('L',file=file,time_index=time_index,time=time,__RC__)
+            if (bracket%left_node == bracket%right_node) then
+               call bracket%swap_node_fields(rc=status)
+               _VERIFY(status)
+            else
+               bracket%new_file_left=.true.
+            end if
+
+            call this%get_file(file,target_time,0,__RC__)
+            call this%get_time_on_file(file,target_time,'R',time_index,time,rc=status)
+            if (status /=  _SUCCESS) then
+               call this%get_file(file,target_time,1,__RC__)
+               call this%get_time_on_file(file,target_time,'R',time_index,time,__RC__)
+            end if
+            call bracket%set_node('R',file=file,time_index=time_index,time=time,__RC__)
+            bracket%new_file_right=.true.
          end if
 
       ! the target time has been specified to be a climatology for the year; either we 
@@ -105,37 +133,65 @@ contains
 
          call ESMF_TimeIntervalSet(zero,__RC__)      
          if (this%frequency == zero) then
-            output_file = this%file_template
+            file = this%file_template
             clim_shift=0
-            call this%get_time_on_file(output_file,target_time,bracketside,time_index,output_time,wrap=clim_shift,__RC__)
-            call swap_year(output_time,original_year+clim_shift,__RC__)
-         else
-            call this%get_file(output_file,target_time,0,__RC__)
-            call this%get_time_on_file(output_file,target_time,bracketside,time_index,output_time,rc=status)
-            call ESMF_TimePrint(target_time,options='string')
-            if (status /=  _SUCCESS) then
-               if ( bracketside == 'R') then
-                  call this%get_file(output_file,target_time,1,__RC__)
-                  call this%get_time_on_file(output_file,target_time,bracketside,time_index,output_time,__RC__)
-                  call ESMF_TimeGet(target_time,yy=target_year,__RC__)
-                  if (target_year < this%clim_year) then
-                     call swap_year(output_time,original_year+1,__RC__)
-                  else 
-                     call swap_year(output_time,original_year,__RC__)
-                  end if         
-               else if (bracketside == 'L') then 
-                  call this%get_file(output_file,target_time,-1,__RC__)
-                  call this%get_time_on_file(output_file,target_time,bracketside,time_index,output_time,__RC__)
-                  call ESMF_TimeGet(target_time,yy=target_year,__RC__)
-                  if (target_year > this%clim_year) then
-                     call swap_year(output_time,original_year-1,__RC__)
-                  else 
-                     call swap_year(output_time,original_year,__RC__)
-                  end if         
-               end if
+            call this%get_time_on_file(file,target_time,'L',time_index,time,wrap=clim_shift,__RC__)
+            call swap_year(time,original_year+clim_shift,__RC__)
+            call bracket%set_node('L',file=file,time_index=time_index,time=time,__RC__)
+            if (bracket%left_node == bracket%right_node) then
+               call bracket%swap_node_fields(rc=status)
+               _VERIFY(status)
             else
-               call swap_year(output_time,original_year,__RC__)
+               bracket%new_file_left=.true.
             end if
+
+            clim_shift=0
+            call this%get_time_on_file(file,target_time,'R',time_index,time,wrap=clim_shift,__RC__)
+            call swap_year(time,original_year+clim_shift,__RC__)
+            call bracket%set_node('R',file=file,time_index=time_index,time=time,__RC__)
+            bracket%new_file_right=.true.
+
+         else
+
+            call this%get_file(file,target_time,0,__RC__)
+            call this%get_time_on_file(file,target_time,'L',time_index,time,rc=status)
+            if (status /=  _SUCCESS) then
+               call this%get_file(file,target_time,-1,__RC__)
+               call this%get_time_on_file(file,target_time,'L',time_index,time,__RC__)
+               call ESMF_TimeGet(target_time,yy=target_year,__RC__)
+               if (target_year > this%clim_year) then
+                  call swap_year(time,original_year-1,__RC__)
+               else 
+                  call swap_year(time,original_year,__RC__)
+               end if         
+            else
+               call swap_year(time,original_year,__RC__)
+            end if
+            if (bracket%left_node == bracket%right_node) then
+               call bracket%swap_node_fields(rc=status)
+               _VERIFY(status)
+            else
+               bracket%new_file_left=.true.
+            end if
+            call bracket%set_node('L',file=file,time_index=time_index,time=time,__RC__)
+
+            call this%get_file(file,target_time,0,__RC__)
+            call this%get_time_on_file(file,target_time,'R',time_index,time,rc=status)
+            if (status /=  _SUCCESS) then
+               call this%get_file(file,target_time,1,__RC__)
+               call this%get_time_on_file(file,target_time,'R',time_index,time,__RC__)
+               call ESMF_TimeGet(target_time,yy=target_year,__RC__)
+               if (target_year < this%clim_year) then
+                  call swap_year(time,original_year+1,__RC__)
+               else 
+                  call swap_year(time,original_year,__RC__)
+               end if         
+            else
+               call swap_year(time,original_year,__RC__)
+            end if
+            call bracket%set_node('R',file=file,time_index=time_index,time=time,__RC__)
+            bracket%new_file_right=.true.
+
          end if
 
       end if

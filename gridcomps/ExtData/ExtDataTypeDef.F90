@@ -38,9 +38,6 @@ module MAPL_ExtDataTypeDef
      class(ExtDataAbstractFileHandler), allocatable :: filestream
 
      type(ESMF_FieldBundle)       :: binterp1, binterp2
-     type(ESMF_Time)              :: time1, time2
-     type(ESMF_Time)              :: interp_time1, interp_time2
-     integer                      :: tindex1,tindex2
      logical                      :: allow_extrap
      type(ESMF_TimeInterval)      :: frequency
      type(ESMF_Time)              :: reff_time
@@ -73,6 +70,7 @@ module MAPL_ExtDataTypeDef
 
      ! new stuff
      logical                      :: cycling
+     logical                      :: persist_closest
      integer, allocatable         :: source_time(:)
   end type PrimaryExport
   

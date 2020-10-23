@@ -9,13 +9,12 @@ module MAPL_ExtDataRule
    type, public :: ExtDataRule
       character(:), allocatable :: file_template_key
       character(:), allocatable :: file_var
-      logical :: allow_extrap
+      !logical :: allow_extrap
       real :: scaling
       real :: shift
       logical :: time_interpolation
       integer, allocatable :: source_time(:)
-      integer :: clim_year
-      logical :: cycling
+      character(:), allocatable :: extrap_outside
       character(:), allocatable :: regrid_method
       character(:), allocatable :: refresh_time
       character(:), allocatable :: refresh_frequency
@@ -53,11 +52,14 @@ contains
       _VERIFY(status)
       _ASSERT(is_present,"Missing file_var in ExtDataRule")
 
-      call config%get(rule%allow_extrap,"allow_extrap",default=.false.,rc=status)
+      !call config%get(rule%allow_extrap,"allow_extrap",default=.false.,rc=status)
+      !_VERIFY(status)
+
+      !call config%get(rule%cycling,"cycling",default=.false.,rc=status)
+      !_VERIFY(status)
+      call config%get(rule%extrap_outside,"extrap",default='none',rc=status)
       _VERIFY(status)
 
-      call config%get(rule%cycling,"cycling",default=.false.,rc=status)
-      _VERIFY(status)
 
       call config%get(rule%scaling,"scaling",default=0.0,rc=status) 
       _VERIFY(status)
@@ -83,9 +85,6 @@ contains
       call config%get(rule%refresh_template,"refresh_template",default='0',rc=status)
       _VERIFY(status)
 
-      call config%get(rule%clim_year,"clim_year",default=-1,rc=status)
-      _VERIFY(status)
-    
       rule%source_time = config%at('source_time')
 
       _RETURN(_SUCCESS)

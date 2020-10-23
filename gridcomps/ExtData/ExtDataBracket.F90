@@ -5,60 +5,121 @@ module MAPL_ExtDataBracket
    use MAPL_KeywordEnforcerMod
    use MAPL_ExceptionHandling
    use MAPL_BaseMod, only: MAPL_UNDEF
+   use MAPL_ExtDataNode
    implicit none
    private
 
-   type, public :: ExtDataBracket
-      type(ESMF_Field) :: left_field,right_field
-      type(ESMF_Time)  :: left_time,right_time
-      character(len=ESMF_MAXPATHLEN) :: left_file, right_file
-      integer :: left_index, right_index
+   public :: ExtDataBracket
+
+   type ExtDataBracket
+      type(ExtDataNode) :: left_node
+      type(ExtDataNode) :: right_node
       real             :: scale_factor = 0.0
       real             :: offset = 0.0
       logical          :: disable_interpolation = .false.
+      logical          :: new_file_right
+      logical          :: new_file_left
       contains
          procedure :: interpolate_to_time
+         procedure :: time_in_bracket
          procedure :: set_parameters
          procedure :: get_parameters
-         procedure :: swap_fields
-   end type
+         procedure :: set_node
+         procedure :: swap_node_fields
+         procedure :: reset
+   end type ExtDataBracket
 
 contains
 
-   subroutine set_parameters(this, unusable, left_time, right_time, left_field, right_field, scale_factor, offset, disable_interpolation, rc)
+   subroutine reset(this)
       class(ExtDataBracket), intent(inout) :: this
+      this%new_file_right=.false.
+      this%new_file_left =.false.
+   end subroutine reset
+
+   logical function time_in_bracket(this,time)
+      class(ExtDataBracket), intent(in) :: this
+      type(ESMF_Time), intent(in) :: time
+
+      time_in_bracket = (this%left_node%time <=time) .and. (time < this%right_node%time)
+
+   end function time_in_bracket
+
+   subroutine set_node(this, bracketside, unusable, field, file, time, time_index, rc)
+      class(ExtDataBracket), intent(inout) :: this
+      character(len=*), intent(in) :: bracketside
       class(KeywordEnforcer), optional, intent(in) :: unusable
-      type(ESMF_Time), optional, intent(in) :: left_time
-      type(ESMF_Time), optional, intent(in) :: right_time
-      type(ESMF_Field), optional, intent(in) :: left_field
-      type(ESMF_Field), optional, intent(in) :: right_field
-      real, optional, intent(in) :: scale_factor
-      real, optional, intent(in) :: offset
-      logical, optional, intent(in) :: disable_interpolation
+      type(ESMF_Field), optional, intent(in) :: field
+      character(len=*), optional, intent(in) :: file
+      integer, optional, intent(in) :: time_index
+      type(ESMF_Time), optional, intent(in) :: time
       integer, optional, intent(out) :: rc
 
       _UNUSED_DUMMY(unusable)
-      if (present(left_time)) this%left_time = left_time
-      if (present(right_time)) this%right_time = right_time
-      if (present(left_field)) this%left_field = left_field
-      if (present(right_field)) this%right_field = right_field
+      if (bracketside=='L') then
+         if (present(field)) this%left_node%field=field
+         if (present(time)) this%left_node%time=time
+         if (present(time_index)) this%left_node%time_index=time_index
+         if (present(file)) this%left_node%file=file
+      else if (bracketside=='R') then
+         if (present(field)) this%right_node%field=field
+         if (present(time)) this%right_node%time=time
+         if (present(time_index)) this%right_node%time_index=time_index
+         if (present(file)) this%right_node%file=file
+      else
+         _ASSERT(.false.,'wrong bracket side')
+      end if
+      _RETURN(_SUCCESS)
+
+   end subroutine set_node
+
+   subroutine set_parameters(this, unusable, scale_factor, offset, disable_interpolation, left_field, right_field, rc)
+      class(ExtDataBracket), intent(inout) :: this
+      class(KeywordEnforcer), optional, intent(in) :: unusable
+      real, optional, intent(in) :: scale_factor
+      real, optional, intent(in) :: offset
+      logical, optional, intent(in) :: disable_interpolation
+      type(ESMF_Field), optional, intent(in) :: left_field
+      type(ESMF_Field), optional, intent(in) :: right_field
+      integer, optional, intent(out) :: rc
+
+      _UNUSED_DUMMY(unusable)
       if (present(scale_factor)) this%scale_factor = scale_factor
       if (present(offset)) this%offset=offset
       if (present(disable_interpolation)) this%disable_interpolation = disable_interpolation
+      if (present(left_field)) this%left_node%field=left_field
+      if (present(right_field)) this%right_node%field=right_field
       _RETURN(_SUCCESS)
 
    end subroutine set_parameters
 
-   subroutine get_parameters(this, unusable, left_field, right_field, rc)
+   subroutine get_parameters(this, bracket_side, unusable, field, file, time, time_index, update, rc)
       class(ExtDataBracket), intent(inout) :: this
+      character(len=*), intent(in) :: bracket_side
       class(KeywordEnforcer), optional, intent(in) :: unusable
-      type(ESMF_Field), optional, intent(inout) :: left_field
-      type(ESMF_Field), optional, intent(inout) :: right_field
+      type(ESMF_Field), optional, intent(out) :: field
+      character(len=*), optional, intent(out) :: file
+      type(ESMF_Time),  optional, intent(out) :: time
+      integer,          optional, intent(out) :: time_index
+      logical,          optional, intent(out) :: update
       integer, optional, intent(out) :: rc
 
       _UNUSED_DUMMY(unusable)
-      if (present(left_field))  left_field = this%left_field
-      if (present(right_field)) right_field = this%right_field
+      if (bracket_side == 'L') then
+          if (present(field))  field = this%left_node%field
+          if (present(file)) file = trim(this%left_node%file)
+          if (present(time)) time = this%left_node%time
+          if (present(time_index)) time_index = this%left_node%time_index
+          if (present(update)) update = this%new_file_left
+      else if (bracket_side == 'R') then
+          if (present(field))  field = this%right_node%field
+          if (present(file)) file = trim(this%right_node%file)
+          if (present(time)) time = this%right_node%time
+          if (present(time_index)) time_index = this%right_node%time_index
+          if (present(update)) update = this%new_file_right
+      else
+         _ASSERT(.false.,'invalid bracket side!')
+      end if
       _RETURN(_SUCCESS)
 
    end subroutine get_parameters
@@ -83,17 +144,17 @@ contains
       call ESMF_FieldGet(field,dimCount=field_rank,__RC__)
       alpha = 0.0
       if (.not.this%disable_interpolation) then
-         tinv1 = time - this%left_time
-         tinv2 = this%right_time - this%left_time
+         tinv1 = time - this%left_node%time
+         tinv2 = this%right_node%time - this%left_node%time
          alpha = tinv1/tinv2
       end if
       if (field_rank==2) then
          call ESMF_FieldGet(field,localDE=0,farrayPtr=var2d,__RC__)
-         call ESMF_FieldGet(this%right_field,localDE=0,farrayPtr=var2d_right,__RC__)
-         call ESMF_FieldGet(this%left_field,localDE=0,farrayPtr=var2d_left,__RC__)
-         if (time == this%left_time .or. this%disable_interpolation) then
+         call ESMF_FieldGet(this%right_node%field,localDE=0,farrayPtr=var2d_right,__RC__)
+         call ESMF_FieldGet(this%left_node%field,localDE=0,farrayPtr=var2d_left,__RC__)
+         if (time == this%left_node%time .or. this%disable_interpolation) then
             var2d = var2d_left
-         else if (time == this%right_time) then
+         else if (time == this%right_node%time) then
             var2d = var2d_right
          else
             where( (var2d_left /= MAPL_UNDEF) .and. (var2d_right /= MAPL_UNDEF))
@@ -115,11 +176,11 @@ contains
 
       else if (field_rank==3) then
          call ESMF_FieldGet(field,localDE=0,farrayPtr=var3d,__RC__)
-         call ESMF_FieldGet(this%right_field,localDE=0,farrayPtr=var3d_right,__RC__)
-         call ESMF_FieldGet(this%left_field,localDE=0,farrayPtr=var3d_left,__RC__)
-         if (time == this%left_time .or. this%disable_interpolation) then
+         call ESMF_FieldGet(this%right_node%field,localDE=0,farrayPtr=var3d_right,__RC__)
+         call ESMF_FieldGet(this%left_node%field,localDE=0,farrayPtr=var3d_left,__RC__)
+         if (time == this%left_node%time .or. this%disable_interpolation) then
             var3d = var3d_left
-         else if (time == this%right_time) then
+         else if (time == this%right_node%time) then
             var3d = var3d_right
          else
             where( (var3d_left /= MAPL_UNDEF) .and. (var3d_right /= MAPL_UNDEF))
@@ -144,7 +205,7 @@ contains
 
    end subroutine interpolate_to_time
 
-   subroutine swap_fields(this,rc)
+   subroutine swap_node_fields(this,rc)
       class(ExtDataBracket), intent(inout) :: this
       integer, optional, intent(out) :: rc
       integer :: status
@@ -152,18 +213,17 @@ contains
       real, pointer :: var3d_left(:,:,:),var3d_right(:,:,:)
       real, pointer :: var2d_left(:,:),var2d_right(:,:)
 
-      this%left_time = this%right_time
-      call ESMF_FieldGet(this%left_field,dimCount=field_rank,__RC__)
+      call ESMF_FieldGet(this%left_node%field,dimCount=field_rank,__RC__)
       if (field_rank == 2) then
-         call ESMF_FieldGet(this%right_field,localDE=0,farrayPtr=var2d_right,__RC__)
-         call ESMF_FieldGet(this%left_field,localDE=0,farrayPtr=var2d_left,__RC__)
+         call ESMF_FieldGet(this%right_node%field,localDE=0,farrayPtr=var2d_right,__RC__)
+         call ESMF_FieldGet(this%left_node%field,localDE=0,farrayPtr=var2d_left,__RC__)
          var2d_left = var2d_right
       else if (field_rank ==3) then
-         call ESMF_FieldGet(this%right_field,localDE=0,farrayPtr=var3d_right,__RC__)
-         call ESMF_FieldGet(this%left_field,localDE=0,farrayPtr=var3d_left,__RC__)
+         call ESMF_FieldGet(this%right_node%field,localDE=0,farrayPtr=var3d_right,__RC__)
+         call ESMF_FieldGet(this%left_node%field,localDE=0,farrayPtr=var3d_left,__RC__)
          var3d_left = var3d_right
       end if
       _RETURN(_SUCCESS)
-   end subroutine swap_fields
+   end subroutine swap_node_fields
 
 end module MAPL_ExtDataBracket

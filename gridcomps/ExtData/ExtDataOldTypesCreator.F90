@@ -111,10 +111,15 @@ module MAPL_ExtDataOldTypesCreator
       end if
 
       ! newstuff
-      primary_item%cycling=rule%cycling
-      primary_item%allow_extrap=rule%allow_extrap
+      if (trim(rule%extrap_outside) =="clim") then
+         primary_item%cycling=.true.
+      else if (trim(rule%extrap_outside) == "persist_closest") then
+         primary_item%persist_closest=.true.
+      else if (trim(rule%extrap_outside) == "none") then
+         primary_item%cycling=.false.
+         primary_item%persist_closest=.false.
+      end if
       allocate(primary_item%source_time,source=rule%source_time)
-
       ! new refresh
       call primary_item%update_freq%create_from_parameters(rule%refresh_time, &
            rule%refresh_frequency, rule%refresh_offset, time, __RC__)
@@ -144,7 +149,7 @@ module MAPL_ExtDataOldTypesCreator
             call clim_handler%initialize(dataset,__RC__)
             allocate(primary_item%filestream,source=clim_handler)
          else
-            call simple_handler%initialize(dataset,__RC__)
+            call simple_handler%initialize(dataset,persist_closest=primary_item%persist_closest,__RC__)
             allocate(primary_item%filestream,source=simple_handler)
          end if
       end if

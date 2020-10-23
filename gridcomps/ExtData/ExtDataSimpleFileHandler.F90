@@ -13,6 +13,8 @@ module MAPL_ExtdataSimpleFileHandler
    use MAPL_FileMetadataUtilsMod
    use MAPL_TimeStringConversion
    use MAPL_StringTemplate
+   use MAPL_ExtDataBracket
+
    implicit none
    private
    public ExtDataSimpleFileHandler
@@ -25,44 +27,64 @@ module MAPL_ExtdataSimpleFileHandler
 
 contains
 
-   subroutine get_file_bracket(this, input_time, bracketside, source_time, output_file, time_index, output_time, rc)
+   subroutine get_file_bracket(this, input_time, source_time, bracket, rc)
       class(ExtdataSimpleFileHandler), intent(inout) :: this
-      type(ESMF_Time), intent(inout) :: input_time
-      character(len=*), intent(in) :: bracketside
+      type(ESMF_Time), intent(in) :: input_time
       integer, intent(in) :: source_time(:)
-      character(len=*), intent(inout) :: output_file
-      integer, intent(out) :: time_index
-      type(ESMF_Time), intent(out) :: output_time
+      type(ExtDataBracket), intent(inout) :: bracket
       integer, optional, intent(out) :: rc
       integer :: status
       type(ESMF_TimeInterval) :: zero
 
+      type(ESMF_Time) :: time
+      integer :: time_index
+      character(len=ESMF_MAXPATHLEN) :: file
+      logical :: get_left, get_right
+
+      if (bracket%time_in_bracket(input_time)) then
+         _RETURN(_SUCCESS)
+      end if
+
       call ESMF_TimeIntervalSet(zero,__RC__)      
       if (this%frequency == zero) then
-         output_file = this%file_template
-         call this%get_time_on_file(output_file,input_time,bracketside,time_index,output_time,__RC__)
-         output_file = output_file
+         file = this%file_template
+         call this%get_time_on_file(file,input_time,'L',time_index,time,__RC__)
+         call bracket%set_node('L',file=file,time_index=time_index,time=time,__RC__)
+         call this%get_time_on_file(file,input_time,'R',time_index,time,__RC__)
+         call bracket%set_node('R',file=file,time_index=time_index,time=time,__RC__)
       else
-         call this%get_file(output_file,input_time,0,__RC__)
-         call this%get_time_on_file(output_file,input_time,bracketside,time_index,output_time,rc=status)
+         call this%get_file(file,input_time,0,__RC__)
+         call this%get_time_on_file(file,input_time,'L',time_index,time,rc=status)
          if (status /=  _SUCCESS) then
-            if ( bracketside == 'R') then
-               call this%get_file(output_file,input_time,1,__RC__)
-               call this%get_time_on_file(output_file,input_time,bracketside,time_index,output_time,__RC__)
-            else if (bracketside == 'L') then 
-               call this%get_file(output_file,input_time,-1,__RC__)
-               call this%get_time_on_file(output_file,input_time,bracketside,time_index,output_time,__RC__)
-            end if
+            call this%get_file(file,input_time,-1,__RC__)
+            call this%get_time_on_file(file,input_time,'L',time_index,time,__RC__)
          end if
+         call bracket%set_node('L',file=file,time_index=time_index,time=time,__RC__)
+         if (bracket%left_node == bracket%right_node) then
+            call bracket%swap_node_fields(rc=status)
+            _VERIFY(status)
+         else
+            bracket%new_file_left=.true.
+         end if
+
+         call this%get_file(file,input_time,0,__RC__)
+         call this%get_time_on_file(file,input_time,'R',time_index,time,rc=status)
+         if (status /=  _SUCCESS) then
+            call this%get_file(file,input_time,1,__RC__)
+            call this%get_time_on_file(file,input_time,'R',time_index,time,__RC__)
+         end if
+         call bracket%set_node('R',file=file,time_index=time_index,time=time,__RC__)
+         bracket%new_file_right=.true.
+
       end if
       _RETURN(_SUCCESS)
    
    end subroutine get_file_bracket
 
-   subroutine get_file(this,filename,target_time,shift,rc)
+   subroutine get_file(this,filename,input_time,shift,rc)
       class(ExtdataSimpleFileHandler), intent(inout) :: this
       character(len=*), intent(out) :: filename
-      type(ESMF_Time) :: target_time
+      type(ESMF_Time) :: input_time
       integer, intent(in) :: shift
       integer, intent(out), optional :: rc
 
@@ -76,12 +98,12 @@ contains
          ! time is not representable as absolute time interval (month, year etc...) do this
          ! brute force way. Not good but ESMF leaves no choice
          ftime=this%reff_time
-         do while (ftime < target_time)
+         do while (ftime < input_time)
             ftime = ftime + this%frequency
          enddo
          ftime=ftime -this%frequency + shift*this%frequency
       else
-         n = (target_time-this%reff_time)/this%frequency 
+         n = (input_time-this%reff_time)/this%frequency 
          ftime = this%reff_time+(n+shift)*this%frequency
       end if
       call fill_grads_template(filename,this%file_template,time=ftime,__RC__)

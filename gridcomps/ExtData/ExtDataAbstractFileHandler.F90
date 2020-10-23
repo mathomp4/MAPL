@@ -5,6 +5,7 @@ module MAPL_ExtdataAbstractFileHandler
    use yafYaml
    use MAPL_KeywordEnforcerMod
    use MAPL_ExceptionHandling
+   use MAPL_ExtDataBracket
    use MAPL_ExtDataFileStream
    use MAPL_ExtDataFileStreamMap
    use MAPL_ExtDataCollectionMod
@@ -23,6 +24,7 @@ module MAPL_ExtdataAbstractFileHandler
       type(ESMF_Time) :: reff_time
       integer :: collection_id
       integer, allocatable :: valid_range(:)
+      logical :: persist_closest
       contains
          procedure :: initialize 
          procedure :: make_metadata
@@ -31,16 +33,14 @@ module MAPL_ExtdataAbstractFileHandler
    end type
 
    abstract interface
-      subroutine get_file_bracket(this,input_time, bracketside, source_time, output_file, time_index, output_time, rc)
+      subroutine get_file_bracket(this, input_time, source_time, bracket, rc)
          use ESMF
+         use MAPL_ExtDataBracket
          import ExtDataAbstractFileHandler
          class(ExtDataAbstractFileHandler), intent(inout)  :: this
-         type(ESMF_Time), intent(inout) :: input_time
-         character(len=*), intent(in) :: bracketside
+         type(ESMF_Time), intent(in) :: input_time
          integer, intent(in) :: source_time(:)
-         character(len=*), intent(inout) :: output_file
-         integer, intent(out) :: time_index
-         type(ESMF_Time), intent(out) :: output_time
+         type(ExtDataBracket), intent(inout) :: bracket
          integer, optional, intent(out) :: rc
       end subroutine get_file_bracket
 
@@ -49,10 +49,11 @@ module MAPL_ExtdataAbstractFileHandler
 
 contains
 
-   subroutine initialize(this,file_series,unusable,rc)
+   subroutine initialize(this,file_series,persist_closest,unusable,rc)
       class(ExtDataAbstractFileHandler), intent(inout)  :: this
       type(ExtDataFileStream), intent(in) :: file_series
       class(KeywordEnforcer), optional, intent(in) :: unusable
+      logical, optional, intent(in) :: persist_closest
       integer, optional, intent(out) :: rc
 
       integer :: status
@@ -64,6 +65,11 @@ contains
       this%reff_time = file_series%reff_time
       allocate(this%valid_range,source=file_series%valid_range)
       this%collection_id = MAPL_ExtDataAddCollection(this%file_template)
+      if (present(persist_closest)) then
+         this%persist_closest = persist_closest
+      else
+         this%persist_closest = .false.
+      end if
 
    end subroutine initialize
 

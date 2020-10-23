@@ -800,155 +800,165 @@ CONTAINS
       call MAPL_TimerOff(MAPLSTATE,"--CheckUpd")
 
       DO_UPDATE: if (doUpdate_) then
-
-         IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-            Write(*,*) '   ExtData Run_: DO_UPDATE: Start. doUpdate_ is true.'
-         ENDIF
-
-         HAS_RUN: if ( hasRun .eqv. .false.) then
-
-            IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-               Write(*,*) '      ExtData Run_: HAS_RUN: Start. hasRun is false. Update time.'
-            ENDIF
-
-            call MAPL_TimerOn(MAPLSTATE,"--Bracket")
-            if (NotSingle) then
-
-               ! update left time
-               IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-                  Write(*,*) '      ExtData Run_: HAS_RUN: NotSingle is true. Update left time (bracket L)'
-               ENDIF
-               call item%filestream%get_file_bracket(time,"L",item%source_time, file_processed,item%tindex1,item%interp_time1,rc=status)
-               _VERIFY(status)
-               call set_bracket_time(item,left_time=item%interp_time1)
-               call IOBundle_Add_Entry(IOBundles,item,self%primaryOrder(i),file_processed,MAPL_ExtDataLeft,item%tindex1,__RC__)
-
-               IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-                  Write(*,*) '      ExtData Run_: HAS_RUN: NotSingle is true. Update right time (bracket R)'    
-               ENDIF
-
-               ! update right time
-               IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-                  Write(*,*) '      ExtData Run_: HAS_RUN: NotSingle is true. Update right time (bracket R)'    
-               ENDIF
-               call item%filestream%get_file_bracket(time,"R",item%source_time,file_processed,item%tindex2,item%interp_time2,rc=status)
-               _VERIFY(STATUS)
-               call set_bracket_time(item,right_time=item%interp_time2)
-               call IOBundle_Add_Entry(IOBundles,item,self%primaryOrder(i),file_processed,MAPL_ExtDataRight,item%tindex2,__RC__)
-
-            else
-
-               IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-                  Write(*,*) '      ExtData Run_: HAS_RUN: NotSingle is false. Just get time on file.'
-               ENDIF
-
-               ! just get time on the file
-               item%time1 = MAPL_ExtDataGetFStartTime(item,trim(item%file),__RC__)
-               item%interp_time1 = item%time1
-               file_processed = item%file
-               call IOBundle_Add_Entry(IOBundles,item,self%primaryOrder(i),file_processed,MAPL_ExtDataLeft,1,__RC__)
-            end if
-            call MAPL_TimerOff(MAPLSTATE,"--Bracket")
-
-            IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-               Write(*,*) '      ExtData Run_: HAS_RUN: End'
-            ENDIF
-
-         endif HAS_RUN
  
-         ! now update bracketing times if neccessary
-
-         NOT_SINGLE: if (NotSingle) then
-
-            IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-               Write(*,*) '      ExtData Run_: NOT_SINGLE: Start. Update bracketing times?'
-            ENDIF
-
-            call ESMF_TimePrint(time,options='string')
-            call ESMF_TimePrint(item%interp_time1,options='string')
-            call ESMF_TimePrint(item%interp_time2,options='string')
-            if (time >= item%interp_time2) then
-               ! normal flow assume clock is moving forward
-               updateR = .true.
-               updateL = .false.
-               swap    = .true.
-            else if (time < item%interp_time1) then
-               ! the can only happen if clock was rewound like in replay update both
-               updateR = .true.
-               updateL = .true.
-               swap    = .false.
-            else
-               updateR = .false.
-               updateL = .false.
-               swap    = .false.
-            end if
-
-            IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-               Write(*,*) '         ==> updateR: ', updateR
-               Write(*,*) '         ==> updateL: ', updateL
-               Write(*,*) '         ==> swap: ', swap
-            ENDIF
-
-            call MAPL_TimerOn(MAPLSTATE,'--Swap')
-            DO_SWAP: if (swap) then
-
-               IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-                  Write(*,*) '            DO_SWAP: Swapping prev and next'
-               ENDIF
-
-               call swapBracketInformation(item,__RC__)
-
-            end if DO_SWAP
-
-            call MAPL_TimerOff(MAPLSTATE,'--Swap')
-
-            UPDATE_R: if (updateR) then
-
-               IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-                  Write(*,*) '         UPDATE_R: updating right bracket'
-               ENDIF
-
-               call MAPL_TimerOn(MAPLSTATE,'--Bracket')
-
-               call item%filestream%get_file_bracket(time,"R",item%source_time,file_processed,item%tindex2,item%interp_time2,rc=status)
-               _VERIFY(STATUS)
-               call set_bracket_time(item,right_time=item%interp_time2)
-               call IOBundle_Add_Entry(IOBundles,item,self%primaryOrder(i),file_processed,MAPL_ExtDataRight,item%tindex2,__RC__)
-
-               call MAPL_TimerOff(MAPLSTATE,'--Bracket')
-
-            end if UPDATE_R
-
-            UPDATE_L: if (updateL) then
-
-               IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-                  Write(*,*) '         UPDATE_L: updating left bracket'
-               ENDIF
-
-               call MAPL_TimerOn(MAPLSTATE,'--Bracket')
-
-               call item%filestream%get_file_bracket(time,"L",item%source_time,file_processed,item%tindex1,item%interp_time1,rc=status)
-               _VERIFY(status)
-               call set_bracket_time(item,left_time=item%interp_time1)
-               call IOBundle_Add_Entry(IOBundles,item,self%primaryOrder(i),file_processed,MAPL_ExtDataLeft,item%tindex1,__RC__)
-
-               call MAPL_TimerOff(MAPLSTATE,'--Bracket')
-
-            end if UPDATE_L
-
-            IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-               Write(*,*) '      ExtData Run_: NOT_SINGLE: End'
-            ENDIF
-
-         endif NOT_SINGLE
-
-         useTime(i) = time
-
-         IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-            Write(*,*) '   ExtData Run_: DO_UPDATE: End'
-         ENDIF
+         call item%modelGridFields%comp1%reset()
+         call item%filestream%get_file_bracket(time,item%source_time, item%modelGridFields%comp1,__RC__)
+         call IOBundle_Add_Entry(IOBundles,item,self%primaryOrder(i))
+         useTime(i)=time
 
       end if DO_UPDATE
+
+
+      !DO_UPDATE: if (doUpdate_) then
+
+         !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+            !Write(*,*) '   ExtData Run_: DO_UPDATE: Start. doUpdate_ is true.'
+         !ENDIF
+
+         !HAS_RUN: if ( hasRun .eqv. .false.) then
+
+            !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+               !Write(*,*) '      ExtData Run_: HAS_RUN: Start. hasRun is false. Update time.'
+            !ENDIF
+
+            !call MAPL_TimerOn(MAPLSTATE,"--Bracket")
+            !if (NotSingle) then
+
+               !! update left time
+               !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+                  !Write(*,*) '      ExtData Run_: HAS_RUN: NotSingle is true. Update left time (bracket L)'
+               !ENDIF
+               !call item%filestream%get_file_bracket(time,"L",item%source_time, file_processed,item%tindex1,item%interp_time1,rc=status)
+               !_VERIFY(status)
+               !call set_bracket_time(item,left_time=item%interp_time1)
+               !call IOBundle_Add_Entry(IOBundles,item,self%primaryOrder(i),file_processed,MAPL_ExtDataLeft,item%tindex1,__RC__)
+
+               !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+                  !Write(*,*) '      ExtData Run_: HAS_RUN: NotSingle is true. Update right time (bracket R)'    
+               !ENDIF
+
+               !! update right time
+               !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+                  !Write(*,*) '      ExtData Run_: HAS_RUN: NotSingle is true. Update right time (bracket R)'    
+               !ENDIF
+               !call item%filestream%get_file_bracket(time,"R",item%source_time,file_processed,item%tindex2,item%interp_time2,rc=status)
+               !_VERIFY(STATUS)
+               !call set_bracket_time(item,right_time=item%interp_time2)
+               !call IOBundle_Add_Entry(IOBundles,item,self%primaryOrder(i),file_processed,MAPL_ExtDataRight,item%tindex2,__RC__)
+
+            !else
+
+               !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+                  !Write(*,*) '      ExtData Run_: HAS_RUN: NotSingle is false. Just get time on file.'
+               !ENDIF
+
+               !! just get time on the file
+               !item%time1 = MAPL_ExtDataGetFStartTime(item,trim(item%file),__RC__)
+               !item%interp_time1 = item%time1
+               !file_processed = item%file
+               !call IOBundle_Add_Entry(IOBundles,item,self%primaryOrder(i),file_processed,MAPL_ExtDataLeft,1,__RC__)
+            !end if
+            !call MAPL_TimerOff(MAPLSTATE,"--Bracket")
+
+            !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+               !Write(*,*) '      ExtData Run_: HAS_RUN: End'
+            !ENDIF
+
+         !endif HAS_RUN
+ 
+         !! now update bracketing times if neccessary
+
+         !NOT_SINGLE: if (NotSingle) then
+
+            !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+               !Write(*,*) '      ExtData Run_: NOT_SINGLE: Start. UpdatemodelGridFieldss?'
+            !ENDIF
+
+            !call ESMF_TimePrint(time,options='string')
+            !call ESMF_TimePrint(item%interp_time1,options='string')
+            !call ESMF_TimePrint(item%interp_time2,options='string')
+            !if (time >= item%interp_time2) then
+               !! normal flow assume clock is moving forward
+               !updateR = .true.
+               !updateL = .false.
+               !swap    = .true.
+            !else if (time < item%interp_time1) then
+               !! the can only happen if clock was rewound like in replay update both
+               !updateR = .true.
+               !updateL = .true.
+               !swap    = .false.
+            !else
+               !updateR = .false.
+               !updateL = .false.
+               !swap    = .false.
+            !end if
+
+            !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+               !Write(*,*) '         ==> updateR: ', updateR
+               !Write(*,*) '         ==> updateL: ', updateL
+               !Write(*,*) '         ==> swap: ', swap
+            !ENDIF
+
+            !call MAPL_TimerOn(MAPLSTATE,'--Swap')
+            !DO_SWAP: if (swap) then
+
+               !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+                  !Write(*,*) '            DO_SWAP: Swapping prev and next'
+               !ENDIF
+
+               !call swapBracketInformation(item,__RC__)
+
+            !end if DO_SWAP
+
+            !call MAPL_TimerOff(MAPLSTATE,'--Swap')
+
+            !UPDATE_R: if (updateR) then
+
+               !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+                  !Write(*,*) '         UPDATE_R: updating right bracket'
+               !ENDIF
+
+               !call MAPL_TimerOn(MAPLSTATE,'--Bracket')
+
+               !call item%filestream%get_file_bracket(time,"R",item%source_time,file_processed,item%tindex2,item%interp_time2,rc=status)
+               !_VERIFY(STATUS)
+               !call set_bracket_time(item,right_time=item%interp_time2)
+               !call IOBundle_Add_Entry(IOBundles,item,self%primaryOrder(i),file_processed,MAPL_ExtDataRight,item%tindex2,__RC__)
+
+               !call MAPL_TimerOff(MAPLSTATE,'--Bracket')
+
+            !end if UPDATE_R
+
+            !UPDATE_L: if (updateL) then
+
+               !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+                  !Write(*,*) '         UPDATE_L: updating left bracket'
+               !ENDIF
+
+               !call MAPL_TimerOn(MAPLSTATE,'--Bracket')
+
+               !call item%filestream%get_file_bracket(time,"L",item%source_time,file_processed,item%tindex1,item%interp_time1,rc=status)
+               !_VERIFY(status)
+               !call set_bracket_time(item,left_time=item%interp_time1)
+               !call IOBundle_Add_Entry(IOBundles,item,self%primaryOrder(i),file_processed,MAPL_ExtDataLeft,item%tindex1,__RC__)
+
+               !call MAPL_TimerOff(MAPLSTATE,'--Bracket')
+
+            !end if UPDATE_L
+
+            !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+               !Write(*,*) '      ExtData Run_: NOT_SINGLE: End'
+            !ENDIF
+
+         !endif NOT_SINGLE
+
+         !useTime(i) = time
+
+         !IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
+            !Write(*,*) '   ExtData Run_: DO_UPDATE: End'
+         !ENDIF
+
+      !end if DO_UPDATE
 
    end do READ_LOOP
 
@@ -1436,18 +1446,18 @@ CONTAINS
 
      end subroutine GetLevs
 
-     subroutine swapBracketInformation(item,rc)
-        type(PrimaryExport), intent(inout) :: item
-        integer, optional, intent(out) :: rc
+     !subroutine swapBracketInformation(item,rc)
+        !type(PrimaryExport), intent(inout) :: item
+        !integer, optional, intent(out) :: rc
 
-        integer :: status
+        !integer :: status
  
-        call item%modelGridFields%comp1%swap_fields(__RC__)
-        if (item%vartype == MAPL_VectorField) then
-           call item%modelGridFields%comp2%swap_fields(__RC__)
-        end if        
+        !call item%modelGridFields%comp1%swap_fields(__RC__)
+        !if (item%vartype == MAPL_VectorField) then
+           !call item%modelGridFields%comp2%swap_fields(__RC__)
+        !end if        
 
-     end subroutine swapBracketInformation
+     !end subroutine swapBracketInformation
 
      subroutine makeMetadata(file,collection_id,metadata,rc)
         character(len=*), intent(in   ) :: file
@@ -2226,34 +2236,34 @@ CONTAINS
 
            if (Bside == MAPL_ExtDataLeft .and. vcomp == 1) then 
               if (getRL_) then
-                 call item%modelGridFields%auxiliary1%get_parameters(left_field=field,__RC__)
+                 call item%modelGridFields%auxiliary1%get_parameters('L',field=field,__RC__)
                  _RETURN(ESMF_SUCCESS)
               else
-                 call item%modelGridFields%comp1%get_parameters(left_field=field,__RC__)
+                 call item%modelGridFields%comp1%get_parameters('L',field=field,__RC__)
                  _RETURN(ESMF_SUCCESS)
               end if
            else if (Bside == MAPL_ExtDataLeft .and. vcomp == 2) then 
               if (getRL_) then
-                 call item%modelGridFields%auxiliary2%get_parameters(left_field=field,__RC__)
+                 call item%modelGridFields%auxiliary2%get_parameters('L',field=field,__RC__)
                  _RETURN(ESMF_SUCCESS)
               else
-                 call item%modelGridFields%comp2%get_parameters(left_field=field,__RC__)
+                 call item%modelGridFields%comp2%get_parameters('L',field=field,__RC__)
                  _RETURN(ESMF_SUCCESS)
               end if
            else if (Bside == MAPL_ExtDataRight .and. vcomp == 1) then 
               if (getRL_) then
-                 call item%modelGridFields%auxiliary1%get_parameters(right_field=field,__RC__)
+                 call item%modelGridFields%auxiliary1%get_parameters('R',field=field,__RC__)
                  _RETURN(ESMF_SUCCESS)
               else
-                 call item%modelGridFields%comp1%get_parameters(right_field=field,__RC__)
+                 call item%modelGridFields%comp1%get_parameters('R',field=field,__RC__)
                  _RETURN(ESMF_SUCCESS)
               end if
            else if (Bside == MAPL_ExtDataRight .and. vcomp == 2) then 
               if (getRL_) then
-                 call item%modelGridFields%auxiliary2%get_parameters(right_field=field,__RC__)
+                 call item%modelGridFields%auxiliary2%get_parameters('R',field=field,__RC__)
                  _RETURN(ESMF_SUCCESS)
               else
-                 call item%modelGridFields%comp2%get_parameters(right_field=field,__RC__)
+                 call item%modelGridFields%comp2%get_parameters('R',field=field,__RC__)
                  _RETURN(ESMF_SUCCESS)
               end if
            end if
@@ -2267,18 +2277,18 @@ CONTAINS
         if (present(field)) then
            if (Bside == MAPL_ExtDataLeft) then
               if (getRL_) then
-                 call item%modelGridFields%auxiliary1%get_parameters(left_field=field,__RC__)
+                 call item%modelGridFields%auxiliary1%get_parameters('L',field=field,__RC__)
                  _RETURN(ESMF_SUCCESS)
               else
-                 call item%modelGridFields%comp1%get_parameters(left_field=field,__RC__)
+                 call item%modelGridFields%comp1%get_parameters('L',field=field,__RC__)
                  _RETURN(ESMF_SUCCESS)
               end if
            else if (Bside == MAPL_ExtDataRight) then
               if (getRL_) then
-                 call item%modelGridFields%auxiliary1%get_parameters(right_field=field,__RC__)
+                 call item%modelGridFields%auxiliary1%get_parameters('R',field=field,__RC__)
                  _RETURN(ESMF_SUCCESS)
               else
-                 call item%modelGridFields%comp1%get_parameters(right_field=field,__RC__)
+                 call item%modelGridFields%comp1%get_parameters('R',field=field,__RC__)
                  _RETURN(ESMF_SUCCESS)
               end if
            end if
@@ -2553,7 +2563,7 @@ CONTAINS
      type (ESMF_Grid) :: grid, newgrid
      type(ESMF_Field) :: field,new_field
 
-     call item%modelGridFields%comp1%get_parameters(left_field=field,__RC__)
+     call item%modelGridFields%comp1%get_parameters('L',field=field,__RC__)
      newGrid = MAPL_ExtDataGridChangeLev(grid,cf,item%lm,__RC__)
      new_field = MAPL_FieldCreate(field,newGrid,lm=item%lm,newName=trim(item%fcomp1),__RC__)
      call item%modelGridFields%auxiliary1%set_parameters(left_field=new_field,__RC__)
@@ -2570,47 +2580,57 @@ CONTAINS
   end subroutine createFileLevBracket
 
 
-  subroutine IOBundle_Add_Entry(IOBundles,item,entry_num,file,bside,time_index,rc)
+  subroutine IOBundle_Add_Entry(IOBundles,item,entry_num,rc)
      type(Iobundlevector), intent(inout) :: IOBundles
-     type(primaryExport), intent(in)        :: item 
+     type(primaryExport), intent(inout)        :: item 
      integer, intent(in)                    :: entry_num
-     character(len=*), intent(in)           :: file
-     integer, intent(in)                    :: bside
-     integer, intent(in)                    :: time_index
      integer, intent(out), optional         :: rc
 
      integer :: status
 
      type (ExtData_IOBundle) :: io_bundle
      type (NewCFIOItemVector) :: items
+     logical :: update
+     character(len=ESMF_MAXPATHLEN) :: file
+     integer :: time_index
 
-     call items%push_back(item%fileVars)
-     io_bundle = ExtData_IOBundle(bside, entry_num, file, time_index, item%trans, item%fracval, item%file, &
-         item%pfioCollection_id,item%iclient_collection_id,items,rc=status)
-     _VERIFY(status)
-
-     call IOBundles%push_back(io_bundle)
+     call item%modelGridFields%comp1%get_parameters('L',update=update,file=file,time_index=time_index)
+     if (update) then    
+        call items%push_back(item%fileVars)
+        io_bundle = ExtData_IOBundle(MAPL_ExtDataLeft, entry_num, file, time_index, item%trans, item%fracval, item%file, &
+            item%pfioCollection_id,item%iclient_collection_id,items,rc=status)
+        _VERIFY(status)
+        call IOBundles%push_back(io_bundle)
+     end if
+     call item%modelGridFields%comp1%get_parameters('R',update=update,file=file,time_index=time_index)
+     if (update) then    
+        call items%push_back(item%fileVars)
+        io_bundle = ExtData_IOBundle(MAPL_ExtDataRight, entry_num, file, time_index, item%trans, item%fracval, item%file, &
+            item%pfioCollection_id,item%iclient_collection_id,items,rc=status)
+        _VERIFY(status)
+        call IOBundles%push_back(io_bundle)
+     end if
 
      _RETURN(ESMF_SUCCESS)
 
   end subroutine IOBundle_Add_Entry
 
-  subroutine set_bracket_time(item,left_time,right_time)
-     type(PrimaryExport), intent(inout) :: item
-     type(ESMF_Time), optional, intent(inout) :: left_time
-     type(ESMF_Time), optional, intent(inout) :: right_time
-     if (present(left_time)) then
-        call item%modelGridFields%comp1%set_parameters(left_time=left_time)
-        call item%modelGridFields%comp2%set_parameters(left_time=left_time)
-        call item%modelGridFields%auxiliary1%set_parameters(left_time=left_time)
-        call item%modelGridFields%auxiliary2%set_parameters(left_time=left_time)
-     end if
-     if (present(right_time)) then
-        call item%modelGridFields%comp1%set_parameters(right_time=right_time)
-        call item%modelGridFields%comp2%set_parameters(right_time=right_time)
-        call item%modelGridFields%auxiliary1%set_parameters(right_time=right_time)
-        call item%modelGridFields%auxiliary2%set_parameters(right_time=right_time)
-     end if
-  end subroutine set_bracket_time
+  !subroutine set_bracket_time(item,left_time,right_time)
+     !type(PrimaryExport), intent(inout) :: item
+     !type(ESMF_Time), optional, intent(inout) :: left_time
+     !type(ESMF_Time), optional, intent(inout) :: right_time
+     !if (present(left_time)) then
+        !call item%modelGridFields%comp1%set_parameters(left_time=left_time)
+        !call item%modelGridFields%comp2%set_parameters(left_time=left_time)
+        !call item%modelGridFields%auxiliary1%set_parameters(left_time=left_time)
+        !call item%modelGridFields%auxiliary2%set_parameters(left_time=left_time)
+     !end if
+     !if (present(right_time)) then
+        !call item%modelGridFields%comp1%set_parameters(right_time=right_time)
+        !call item%modelGridFields%comp2%set_parameters(right_time=right_time)
+        !call item%modelGridFields%auxiliary1%set_parameters(right_time=right_time)
+        !call item%modelGridFields%auxiliary2%set_parameters(right_time=right_time)
+     !end if
+  !end subroutine set_bracket_time
 
  END MODULE MAPL_ExtDataGridCompNG
