@@ -71,7 +71,7 @@ module MAPL_ExtDataTypeDef
      ! new stuff
      logical                      :: cycling
      logical                      :: persist_closest
-     integer, allocatable         :: source_time(:)
+     type(ESMF_Time), allocatable :: source_time(:)
   end type PrimaryExport
   
   type DerivedExport

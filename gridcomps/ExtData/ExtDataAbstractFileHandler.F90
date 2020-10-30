@@ -23,7 +23,7 @@ module MAPL_ExtdataAbstractFileHandler
       type(ESMF_TimeInterval) :: frequency
       type(ESMF_Time) :: reff_time
       integer :: collection_id
-      integer, allocatable :: valid_range(:)
+      type(ESMF_Time), allocatable :: valid_range(:)
       logical :: persist_closest
       contains
          procedure :: initialize 
@@ -39,7 +39,7 @@ module MAPL_ExtdataAbstractFileHandler
          import ExtDataAbstractFileHandler
          class(ExtDataAbstractFileHandler), intent(inout)  :: this
          type(ESMF_Time), intent(in) :: input_time
-         integer, intent(in) :: source_time(:)
+         type(ESMF_Time), intent(in) :: source_time(:)
          type(ExtDataBracket), intent(inout) :: bracket
          integer, optional, intent(out) :: rc
       end subroutine get_file_bracket

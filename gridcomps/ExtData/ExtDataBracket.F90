@@ -25,6 +25,7 @@ module MAPL_ExtDataBracket
          procedure :: set_parameters
          procedure :: get_parameters
          procedure :: set_node
+         procedure :: get_node
          procedure :: swap_node_fields
          procedure :: reset
    end type ExtDataBracket
@@ -45,7 +46,7 @@ contains
 
    end function time_in_bracket
 
-   subroutine set_node(this, bracketside, unusable, field, file, time, time_index, rc)
+   subroutine set_node(this, bracketside, unusable, field, file, time, time_index, was_set, rc)
       class(ExtDataBracket), intent(inout) :: this
       character(len=*), intent(in) :: bracketside
       class(KeywordEnforcer), optional, intent(in) :: unusable
@@ -53,6 +54,7 @@ contains
       character(len=*), optional, intent(in) :: file
       integer, optional, intent(in) :: time_index
       type(ESMF_Time), optional, intent(in) :: time
+      logical, optional, intent(in) :: was_set
       integer, optional, intent(out) :: rc
 
       _UNUSED_DUMMY(unusable)
@@ -61,17 +63,51 @@ contains
          if (present(time)) this%left_node%time=time
          if (present(time_index)) this%left_node%time_index=time_index
          if (present(file)) this%left_node%file=file
+         if (present(was_set)) this%left_node%was_set=was_set
       else if (bracketside=='R') then
          if (present(field)) this%right_node%field=field
          if (present(time)) this%right_node%time=time
          if (present(time_index)) this%right_node%time_index=time_index
          if (present(file)) this%right_node%file=file
+         if (present(was_set)) this%right_node%was_set=was_set
       else
          _ASSERT(.false.,'wrong bracket side')
       end if
       _RETURN(_SUCCESS)
 
    end subroutine set_node
+
+   subroutine get_node(this, bracketside, unusable, field, file, time, time_index, was_set, rc)
+      class(ExtDataBracket), intent(inout) :: this
+      character(len=*), intent(in) :: bracketside
+      class(KeywordEnforcer), optional, intent(in) :: unusable
+      type(ESMF_Field), optional, intent(out) :: field
+      character(len=*), optional, intent(out) :: file
+      integer, optional, intent(out) :: time_index
+      type(ESMF_Time), optional, intent(out) :: time
+      logical, optional, intent(out) :: was_set
+      integer, optional, intent(out) :: rc
+
+      _UNUSED_DUMMY(unusable)
+      if (bracketside=='L') then
+         if (present(field)) field=this%left_node%field
+         if (present(time)) time=this%left_node%time
+         if (present(time_index)) time_index=this%left_node%time_index
+         if (present(file)) file=this%left_node%file
+         if (present(was_set)) was_set=this%left_node%was_set
+      else if (bracketside=='R') then
+         if (present(field)) field=this%right_node%field
+         if (present(time)) time=this%right_node%time
+         if (present(time_index)) time_index=this%right_node%time_index
+         if (present(file)) file=this%right_node%file
+         if (present(was_set)) was_set=this%right_node%was_set
+      else
+         _ASSERT(.false.,'wrong bracket side')
+      end if
+      _RETURN(_SUCCESS)
+
+   end subroutine get_node
+
 
    subroutine set_parameters(this, unusable, scale_factor, offset, disable_interpolation, left_field, right_field, rc)
       class(ExtDataBracket), intent(inout) :: this

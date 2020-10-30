@@ -1,8 +1,10 @@
 #include "MAPL_ErrLog.h"
 module MAPL_ExtDataRule
    use yaFyaml
+   use ESMF
    use MAPL_KeywordEnforcerMod
    use MAPL_ExceptionHandling
+   use MAPL_TimeStringConversion
    implicit none
    private
 
@@ -13,7 +15,7 @@ module MAPL_ExtDataRule
       real :: scaling
       real :: shift
       logical :: time_interpolation
-      integer, allocatable :: source_time(:)
+      type(ESMF_Time), allocatable :: source_time(:)
       character(:), allocatable :: extrap_outside
       character(:), allocatable :: regrid_method
       character(:), allocatable :: refresh_time
@@ -41,6 +43,8 @@ contains
       type(ExtDataRule), target :: rule
       logical :: is_present
       integer :: status
+      character(len=:), allocatable :: source_str
+      integer :: idx
     
       _UNUSED_DUMMY(unusable)
 
@@ -85,7 +89,17 @@ contains
       call config%get(rule%refresh_template,"refresh_template",default='0',rc=status)
       _VERIFY(status)
 
-      rule%source_time = config%at('source_time')
+      call config%get(source_str,"source_time",default='',rc=status)
+      _VERIFY(status)
+      if (source_str /= '') then
+         idx = index(source_str,',')
+         _ASSERT(idx/=0,'invalid specification of source_time')
+         allocate(rule%source_time(2))
+         rule%source_time(1)=string_to_esmf_time(source_str(:idx-1))
+         rule%source_time(2)=string_to_esmf_time(source_str(idx+1:))
+      else 
+         allocate(rule%source_time(0))
+      end if
 
       _RETURN(_SUCCESS)
    end function new_ExtDataRule_from_yaml

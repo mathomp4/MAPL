@@ -30,7 +30,7 @@ contains
    subroutine get_file_bracket(this, input_time, source_time, bracket, rc)
       class(ExtdataSimpleFileHandler), intent(inout) :: this
       type(ESMF_Time), intent(in) :: input_time
-      integer, intent(in) :: source_time(:)
+      type(ESMF_Time), intent(in) :: source_time(:)
       type(ExtDataBracket), intent(inout) :: bracket
       integer, optional, intent(out) :: rc
       integer :: status
@@ -39,42 +39,80 @@ contains
       type(ESMF_Time) :: time
       integer :: time_index
       character(len=ESMF_MAXPATHLEN) :: file
-      logical :: get_left, get_right
+      logical :: get_left, get_right,in_range,was_set
+      type(ESMF_Time) :: target_time
 
-      if (bracket%time_in_bracket(input_time)) then
+
+      get_left=.true.
+      get_right=.true.
+      in_range=.true.
+      target_time=input_time
+      if (this%persist_closest) then
+         if (input_time < this%valid_range(1)) then
+            target_time = this%valid_range(1)
+            get_right = .false.
+            in_range = .false.
+            call bracket%get_node('L',was_set=was_set)
+            if (was_set) get_left=.false.
+         else if (input_time > this%valid_range(2)) then
+            target_time = this%valid_range(2)
+            get_right = .false.
+            in_range = .false.
+            call bracket%get_node('L',was_set=was_set)
+            if (was_set) get_left=.false.
+         end if
+      end if
+      if (bracket%time_in_bracket(target_time) .and. in_range) then
          _RETURN(_SUCCESS)
       end if
 
       call ESMF_TimeIntervalSet(zero,__RC__)      
       if (this%frequency == zero) then
          file = this%file_template
-         call this%get_time_on_file(file,input_time,'L',time_index,time,__RC__)
-         call bracket%set_node('L',file=file,time_index=time_index,time=time,__RC__)
-         call this%get_time_on_file(file,input_time,'R',time_index,time,__RC__)
-         call bracket%set_node('R',file=file,time_index=time_index,time=time,__RC__)
-      else
-         call this%get_file(file,input_time,0,__RC__)
-         call this%get_time_on_file(file,input_time,'L',time_index,time,rc=status)
-         if (status /=  _SUCCESS) then
-            call this%get_file(file,input_time,-1,__RC__)
-            call this%get_time_on_file(file,input_time,'L',time_index,time,__RC__)
+         if (get_left) then
+            call this%get_time_on_file(file,target_time,'L',time_index,time,__RC__)
+            call bracket%set_node('L',file=file,time_index=time_index,time=time,__RC__)
+            if (in_range .and. (bracket%left_node == bracket%right_node)) then
+               call bracket%swap_node_fields(rc=status)
+               _VERIFY(status)
+            else
+               bracket%new_file_left=.true.
+               call bracket%set_node('L',was_set=.true.)
+            end if
          end if
-         call bracket%set_node('L',file=file,time_index=time_index,time=time,__RC__)
-         if (bracket%left_node == bracket%right_node) then
-            call bracket%swap_node_fields(rc=status)
-            _VERIFY(status)
-         else
-            bracket%new_file_left=.true.
+         if (get_right) then
+            call this%get_time_on_file(file,target_time,'R',time_index,time,__RC__)
+            call bracket%set_node('R',file=file,time_index=time_index,time=time,__RC__)
+            bracket%new_file_right=.true.
+         end if
+      else
+         if (get_left) then
+            call this%get_file(file,target_time,0,__RC__)
+            call this%get_time_on_file(file,target_time,'L',time_index,time,rc=status)
+            if (status /=  _SUCCESS) then
+               call this%get_file(file,target_time,-1,__RC__)
+               call this%get_time_on_file(file,target_time,'L',time_index,time,__RC__)
+            end if
+            call bracket%set_node('L',file=file,time_index=time_index,time=time,__RC__)
+            if (in_range .and. (bracket%left_node == bracket%right_node)) then
+               call bracket%swap_node_fields(rc=status)
+               _VERIFY(status)
+            else
+               bracket%new_file_left=.true.
+               call bracket%set_node('L',was_set=.true.)
+            end if
          end if
 
-         call this%get_file(file,input_time,0,__RC__)
-         call this%get_time_on_file(file,input_time,'R',time_index,time,rc=status)
-         if (status /=  _SUCCESS) then
-            call this%get_file(file,input_time,1,__RC__)
-            call this%get_time_on_file(file,input_time,'R',time_index,time,__RC__)
+         if (get_right) then
+            call this%get_file(file,target_time,0,__RC__)
+            call this%get_time_on_file(file,target_time,'R',time_index,time,rc=status)
+            if (status /=  _SUCCESS) then
+               call this%get_file(file,target_time,1,__RC__)
+               call this%get_time_on_file(file,target_time,'R',time_index,time,__RC__)
+            end if
+            call bracket%set_node('R',file=file,time_index=time_index,time=time,__RC__)
+            bracket%new_file_right=.true.
          end if
-         call bracket%set_node('R',file=file,time_index=time_index,time=time,__RC__)
-         bracket%new_file_right=.true.
 
       end if
       _RETURN(_SUCCESS)

@@ -17,7 +17,7 @@ module MAPL_ExtDataFileStream
       type(ESMF_TimeInterval) :: frequency
       type(ESMF_Time) :: reff_time
       integer :: collection_id
-      integer, allocatable :: valid_range(:)
+      type(ESMF_Time), allocatable :: valid_range(:)
    end type
 
    interface ExtDataFileStream
@@ -35,9 +35,9 @@ contains
       type(ExtDataFileStream), target :: data_set
       integer :: status
       integer :: last_token
-      integer :: iyy,imm,idd,ihh,imn,isc
+      integer :: iyy,imm,idd,ihh,imn,isc,idx
       character(len=2) :: token
-      character(len=:), allocatable :: file_frequency, file_reff_time
+      character(len=:), allocatable :: file_frequency, file_reff_time,range_str
       logical :: is_present
 
       _UNUSED_DUMMY(unusable)
@@ -99,11 +99,17 @@ contains
          end if
       end if
 
-      data_set%valid_range = config%at("valid_range")
-      if (size(data_set%valid_range) > 0) then
-         _ASSERT(size(data_set%valid_range)==2,'valid_range must be 2 integers')
+      call config%get(range_str,"valid_range",default='',rc=status)
+      _VERIFY(status)
+      if (range_str /= '') then
+         idx = index(range_str,',')
+         _ASSERT(idx/=0,'invalid specification of time range')
+         allocate(data_set%valid_range(2))
+         data_set%valid_range(1)=string_to_esmf_time(range_str(:idx-1))
+         data_set%valid_range(2)=string_to_esmf_time(range_str(idx+1:))
          call ESMF_TimeGet(data_set%reff_time,yy=iyy,mm=imm,dd=idd,h=ihh,m=imn,__RC__)
-         call ESMF_TimeSet(data_set%reff_time,yy=data_set%valid_range(1),mm=imm,dd=idd,h=ihh,m=imn,__RC__)
+         call ESMF_TimeGet(data_set%valid_range(1),yy=iyy,__RC__)
+         call ESMF_TimeSet(data_set%reff_time,yy=iyy,mm=imm,dd=idd,h=ihh,m=imn,__RC__)
       end if
       data_set%collection_id = MAPL_ExtDataAddCollection(data_set%file_template)
 

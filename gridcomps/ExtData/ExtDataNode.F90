@@ -13,6 +13,7 @@ module MAPL_ExtDataNode
       type(ESMF_Time)  :: time
       character(len=ESMF_MAXPATHLEN) :: file
       integer :: time_index
+      logical :: was_set
       contains
          procedure :: set
          procedure :: get
@@ -22,13 +23,14 @@ module MAPL_ExtDataNode
 
 contains
 
-   subroutine set(this, unusable, field, time, file, time_index, rc)
+   subroutine set(this, unusable, field, time, file, time_index, was_set, rc)
       class(ExtDataNode), intent(inout) :: this
       class(KeywordEnforcer), optional, intent(in) :: unusable
       type(ESMF_Time), optional, intent(in) :: time
       type(ESMF_Field), optional, intent(in) :: field
       character(len=*), optional, intent(in) :: file
       integer, optional, intent(in) :: time_index
+      logical, optional, intent(in) :: was_set
       integer, optional, intent(out) :: rc
 
       _UNUSED_DUMMY(unusable)
@@ -36,17 +38,19 @@ contains
       if (present(field)) this%field = field
       if (present(file)) this%file = trim(file)
       if (present(time_index)) this%time_index = time_index
+      if (present(was_set)) this%was_set = was_set
       _RETURN(_SUCCESS)
 
    end subroutine set
 
-   subroutine get(this, unusable, field, time, file, time_index, rc)
+   subroutine get(this, unusable, field, time, file, time_index, was_set, rc)
       class(ExtDataNode), intent(inout) :: this
       class(KeywordEnforcer), optional, intent(in) :: unusable
       type(ESMF_Time), optional, intent(out) :: time
       type(ESMF_Field), optional, intent(out) :: field
       character(len=*), optional, intent(out) :: file
       integer, optional, intent(out) :: time_index
+      logical, optional, intent(out) :: was_set
       integer, optional, intent(out) :: rc
 
       _UNUSED_DUMMY(unusable)
@@ -54,6 +58,7 @@ contains
       if (present(field)) field = this%field
       if (present(file)) file = trim(this%file)
       if (present(time_index)) time_index = this%time_index
+      if (present(was_set)) was_set = this%was_set
       _RETURN(_SUCCESS)
 
    end subroutine get

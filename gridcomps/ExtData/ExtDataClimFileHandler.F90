@@ -31,7 +31,7 @@ contains
    subroutine get_file_bracket(this, input_time, source_time, bracket, rc)
       class(ExtdataClimFileHandler), intent(inout) :: this
       type(ESMF_Time), intent(in) :: input_time
-      integer, intent(in) :: source_time(:)
+      type(ESMF_Time), intent(in) :: source_time(:)
       type(ExtDataBracket), intent(inout) :: bracket
       integer, optional, intent(out) :: rc
 
@@ -42,7 +42,8 @@ contains
       type(ESMF_TimeInterval) :: zero
       type(ESMF_Time) :: target_time
 
-      integer :: target_year, original_year,clim_shift
+      integer :: target_year, original_year,clim_shift,valid_years(2)
+      integer, allocatable :: source_years(:)
      
       
       if (bracket%time_in_bracket(input_time)) then
@@ -51,11 +52,16 @@ contains
 
       target_time=input_time
       _ASSERT(size(this%valid_range) == 2, 'Valid time is not defined so can not do any extrapolation or climatology')
+      call ESMF_TimeGet(this%valid_range(1),yy=valid_years(1),__RC__)
+      call ESMF_TimeGet(this%valid_range(2),yy=valid_years(2),__RC__)
       if (size(source_time)==2) then
-         _ASSERT(source_time(1) >= this%valid_range(1),'source time outide valid range')
-         _ASSERT(source_time(1) <=  this%valid_range(2),'source time outide valid range')
-         _ASSERT(source_time(2) >=  this%valid_range(1),'source time outide valid range')
-         _ASSERT(source_time(2) <= this%valid_range(1),'source time outide valid range')
+         allocate(source_years(2))
+         call ESMF_TimeGet(source_time(1),yy=source_years(1),__RC__)
+         call ESMF_TimeGet(source_time(2),yy=source_years(2),__RC__)
+         _ASSERT(source_years(1) >= valid_years(1),'source time outide valid range')
+         _ASSERT(source_years(1) <=  valid_years(2),'source time outide valid range')
+         _ASSERT(source_years(2) >=  valid_years(1),'source time outide valid range')
+         _ASSERT(source_years(2) <= valid_years(2),'source time outide valid range')
       end if
 
       ! shift target year to request source time if specified
@@ -63,22 +69,22 @@ contains
       call ESMF_TimeGet(target_time,yy=target_year,__RC__)
       original_year=target_year
 
-      if (size(source_time)>0) then
-         if (target_year < source_time(1)) then
-            target_year = source_time(1)
+      if (size(source_years)>0) then
+         if (target_year < source_years(1)) then
+            target_year = source_years(1)
             this%clim_year = target_year 
-         else if (target_year >= source_time(2)) then
-            target_year = source_time(2)
+         else if (target_year >= source_years(2)) then
+            target_year = source_years(2)
             this%clim_year = target_year 
          end if
          call swap_year(target_time,target_year,__RC__)
       else
-         if (target_year < this%valid_range(1)) then
-            target_year = this%valid_range(1)
-            this%clim_year = target_year 
+         if (target_year < valid_years(1)) then
+            target_year = valid_years(1)
+            this%clim_year = target_year
             call swap_year(target_time,target_year,__RC__)
-         else if (target_year >= this%valid_range(2)) then
-            target_year = this%valid_range(2)
+         else if (target_year >= valid_years(2)) then
+            target_year = valid_years(2)
             this%clim_year = target_year
             call swap_year(target_time,target_year,__RC__)
          end if 
