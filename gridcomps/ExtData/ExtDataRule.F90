@@ -56,14 +56,8 @@ contains
       _VERIFY(status)
       _ASSERT(is_present,"Missing file_var in ExtDataRule")
 
-      !call config%get(rule%allow_extrap,"allow_extrap",default=.false.,rc=status)
-      !_VERIFY(status)
-
-      !call config%get(rule%cycling,"cycling",default=.false.,rc=status)
-      !_VERIFY(status)
       call config%get(rule%extrap_outside,"extrap",default='none',rc=status)
       _VERIFY(status)
-
 
       call config%get(rule%scaling,"scaling",default=0.0,rc=status) 
       _VERIFY(status)

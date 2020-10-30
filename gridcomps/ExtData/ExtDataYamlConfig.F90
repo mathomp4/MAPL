@@ -2,6 +2,7 @@
 module MAPL_ExtDataYamlConfig
    use ESMF
    use yaFyaml
+   use gFTL_StringVector
    use MAPL_KeywordEnforcerMod
    use MAPL_ExceptionHandling
    use MAPL_ExtDataFileStream
@@ -15,7 +16,6 @@ module MAPL_ExtDataYamlConfig
 
    type, public :: ExtDataYamlConfig
       integer :: debug
-      character(len=:), allocatable :: config_file
       type(ExtDataRuleMap) :: rule_map
       type(ExtDataDerivedMap) :: derived_map
       type(ExtDataFileStreamMap) :: file_stream_map
@@ -31,13 +31,13 @@ module MAPL_ExtDataYamlConfig
 
 contains
 
-   function new_ExtDataYamlConfig_from_yaml(config_file,current_time,unusable,rc) result(ext_config)
+   recursive subroutine new_ExtDataYamlConfig_from_yaml(ext_config,config_file,current_time,unusable,rc) 
+      type(ExtDataYamlConfig), intent(inout), target :: ext_config
       character(len=*), intent(in) :: config_file
       type(ESMF_Time), intent(in) :: current_time
       class(KeywordEnforcer), optional, intent(in) :: unusable
       integer, optional, intent(out) :: rc
 
-      type(ExtDataYamlConfig), target :: ext_config
       type(Parser)              :: p
       type(Configuration) :: config,subcfg, ds_config, rule_config, derived_config
       type(ConfigurationIterator) :: iter
@@ -48,6 +48,9 @@ contains
       integer :: status, semi_pos
       character(len=:), allocatable :: uname,vname
       type(FileStream) :: fstream
+      type(StringVector) :: subconfigs
+      logical :: is_present
+      integer :: i
 
       _UNUSED_DUMMY(unusable)
 
@@ -55,12 +58,17 @@ contains
       fstream=FileStream(config_file)
       config = p%load(fstream)
       call fstream%close()
-      ext_config%config_file=config_file
+
+      subconfigs = config%at("subconfigs")
+      do i=1,subconfigs%size()
+         call new_ExtDataYamlConfig_from_yaml(ext_config,subconfigs%at(i),current_time,rc=status)
+         _VERIFY(status)
+      enddo
 
       ds_config = config%at("data_sets")
-      _ASSERT(.not.ds_config%is_none(),"data_sets key not found in ExtData rc file")
+      !_ASSERT(.not.ds_config%is_none(),"data_sets key not found in ExtData rc file")
       rule_config = config%at("rules")
-      _ASSERT(.not.rule_config%is_none(),"rules key not found in ExtData rc file")
+      !_ASSERT(.not.rule_config%is_none(),"rules key not found in ExtData rc file")
       derived_config = config%at("derived")
 
       iter = ds_config%begin()
@@ -86,6 +94,7 @@ contains
             call ext_config%rule_map%insert(trim(uname),ucomp)
             call ext_config%rule_map%insert(trim(vname),vcomp)
          else
+         write(*,*)'bmaa insert key: ',trim(key)
             call ext_config%rule_map%insert(trim(key),rule)
          end if
          call iter%next()
@@ -107,7 +116,7 @@ contains
       _VERIFY(status)
 
       _RETURN(_SUCCESS)
-   end function new_ExtDataYamlConfig_from_yaml
+   end subroutine new_ExtDataYamlConfig_from_yaml
 
    logical function name_in_config(this,item_name,unusable,rc)
       class(ExtDataYamlConfig), intent(inout) :: this

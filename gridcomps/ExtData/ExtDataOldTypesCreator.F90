@@ -46,7 +46,7 @@ module MAPL_ExtDataOldTypesCreator
       integer :: status
 
       _UNUSED_DUMMY(unusable)
-      ExtDataObj%ExtDataYamlConfig = ExtDataYamlConfig(config_file,current_time,rc=status)
+      call ExtDataYamlConfig(ExtDataObj%ExtDataYamlConfig,config_file,current_time,rc=status)
       _VERIFY(status)
 
       _RETURN(_SUCCESS)
