@@ -94,7 +94,6 @@ contains
             call ext_config%rule_map%insert(trim(uname),ucomp)
             call ext_config%rule_map%insert(trim(vname),vcomp)
          else
-         write(*,*)'bmaa insert key: ',trim(key)
             call ext_config%rule_map%insert(trim(key),rule)
          end if
          call iter%next()
