@@ -38,12 +38,11 @@ module MAPL_ExtDataTypeDef
      class(ExtDataAbstractFileHandler), allocatable :: filestream
 
      type(ESMF_FieldBundle)       :: binterp1, binterp2
-     logical                      :: allow_extrap
      type(ESMF_TimeInterval)      :: frequency
      type(ESMF_Time)              :: reff_time
 
      ! if primary export represents a pair of vector fields
-     logical                      :: isVector, foundComp1, foundComp2
+     logical                      :: isVector
      type(BracketingFields)       :: modelGridFields
 
      ! names of the two vector components in the gridded component where import is declared

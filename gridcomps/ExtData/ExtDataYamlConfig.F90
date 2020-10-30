@@ -15,7 +15,6 @@ module MAPL_ExtDataYamlConfig
 
    type, public :: ExtDataYamlConfig
       integer :: debug
-      logical :: allow_extrapolation
       character(len=:), allocatable :: config_file
       type(ExtDataRuleMap) :: rule_map
       type(ExtDataDerivedMap) :: derived_map
@@ -24,7 +23,6 @@ module MAPL_ExtDataYamlConfig
          procedure :: name_in_config
          procedure :: count_number
          procedure :: get_debug_flag
-         procedure :: get_extrap_flag
    end type
 
    interface ExtDataYamlConfig
@@ -108,9 +106,6 @@ contains
       call config%get(ext_config%debug,"debug",default=0,rc=status)
       _VERIFY(status)
 
-      call config%get(ext_config%allow_extrapolation,"allow_extrapolation",default=.false.,rc=status)
-      _VERIFY(status)
-
       _RETURN(_SUCCESS)
    end function new_ExtDataYamlConfig_from_yaml
 
@@ -173,10 +168,5 @@ contains
       class(ExtDataYamlConfig), intent(inout) :: this
       get_debug_flag=this%debug
    end function get_debug_flag 
-
-   logical function get_extrap_flag(this)
-      class(ExtDataYamlConfig), intent(inout) :: this
-      get_extrap_flag=this%allow_extrapolation
-   end function get_extrap_flag 
 
 end module MAPL_ExtDataYamlConfig

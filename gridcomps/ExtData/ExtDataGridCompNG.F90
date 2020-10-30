@@ -434,7 +434,7 @@ CONTAINS
    end if
       
    ext_debug=config_yaml%get_debug_flag()
-   self%allowExtrap=config_yaml%get_extrap_flag()
+   self%allowExtrap=.true.
    allocate(self%primary%item(PrimaryItemCount),__STAT__)
    allocate(self%derived%item(DerivedItemCount),__STAT__)
    self%primary%nitems = PrimaryItemCount
