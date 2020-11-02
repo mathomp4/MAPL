@@ -1272,19 +1272,6 @@ CONTAINS
 
      end subroutine GetLevs
 
-     !subroutine swapBracketInformation(item,rc)
-        !type(PrimaryExport), intent(inout) :: item
-        !integer, optional, intent(out) :: rc
-
-        !integer :: status
- 
-        !call item%modelGridFields%comp1%swap_fields(__RC__)
-        !if (item%vartype == MAPL_VectorField) then
-           !call item%modelGridFields%comp2%swap_fields(__RC__)
-        !end if        
-
-     !end subroutine swapBracketInformation
-
      subroutine makeMetadata(file,collection_id,metadata,rc)
         character(len=*), intent(in   ) :: file
         integer, intent(in)                       :: collection_id
