@@ -5,14 +5,13 @@ module MAPL_ExtDataPointerUpdate
    use ESMF
    use MAPL_KeywordEnforcerMod
    use MAPL_ExceptionHandling
-   use MAPL_SimpleAlarm
    use MAPL_TimeStringConversion
    implicit none
 
    type :: ExtDataPointerUpdate
       private
       logical :: disabled = .false.
-      type(SimpleAlarm) :: update_alarm
+      type(ESMF_Alarm) :: update_alarm
       type(ESMF_TimeInterval) :: offset
       logical :: single_shot = .false.
       contains
@@ -25,12 +24,13 @@ module MAPL_ExtDataPointerUpdate
 
    contains
 
-   subroutine create_from_parameters(this,update_time,update_freq,update_offset,time,rc)
+   subroutine create_from_parameters(this,update_time,update_freq,update_offset,time,clock,rc)
       class(ExtDataPointerUpdate), intent(inout) :: this
       character(len=*), intent(in) :: update_time
       character(len=*), intent(in) :: update_freq
       character(len=*), intent(in) :: update_offset
       type(ESMF_Time), intent(inout) :: time
+      type(ESMF_Clock), intent(inout) :: clock
       integer, optional, intent(out) :: rc
 
       type(ESMF_Time) :: reference_time
@@ -47,7 +47,7 @@ module MAPL_ExtDataPointerUpdate
          call ESMF_TimeGet(time,yy=year,mm=month,dd=day,__RC__)
          call ESMF_TimeSet(reference_time,yy=year,mm=month,dd=day,h=hour,m=minute,s=second,__RC__)
          reference_freq = string_to_esmf_timeinterval(update_freq,__RC__)
-         this%update_alarm = simpleAlarm(reference_time,reference_freq,__RC__)
+         this%update_alarm = ESMF_AlarmCreate(clock,ringTime=reference_time,ringInterval=reference_freq,sticky=.false.,__RC__)
       end if
       this%offset=string_to_esmf_timeinterval(update_offset,__RC__)
       _RETURN(_SUCCESS)
@@ -67,8 +67,8 @@ module MAPL_ExtDataPointerUpdate
          do_update = .false.
          _RETURN(_SUCCESS)
       end if
-      if (this%update_alarm%check_if_created()) then
-         do_update = this%update_alarm%is_ringing(current_time,__RC__)
+      if (ESMF_AlarmIsCreated(this%update_alarm)) then
+         do_update = ESMF_AlarmIsRinging(this%update_alarm,__RC__)
       else
          do_update = .true.
          if (this%single_shot) this%disabled = .true.

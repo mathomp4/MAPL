@@ -50,7 +50,6 @@
    use pFIO_ClientManagerMod, only : i_Clients
    use MAPL_newCFIOItemMod
    use MAPL_newCFIOItemVectorMod
-   use MAPL_SimpleAlarm
    use MAPL_ExtDataYamlConfig
    use MAPL_ExtDataTypeDef
    use MAPL_ExtDataOldTypesCreator
@@ -446,10 +445,10 @@ CONTAINS
    do i=1,size(itemnames)
       if (item_types(i)==Primary_Type_Scalar .or. item_types(i)==Primary_Type_Vector_comp1) then
          num_primary=num_primary+1
-         call config_yaml%fillin_primary(trim(itemnames(i)),self%primary%item(num_primary),time,__RC__)
+         call config_yaml%fillin_primary(trim(itemnames(i)),self%primary%item(num_primary),time,clock,__RC__)
       else if (item_types(i)==Derived_type) then
          num_derived=num_derived+1
-         call config_yaml%fillin_derived(trim(itemnames(i)),self%derived%item(num_derived),time,__RC__)
+         call config_yaml%fillin_derived(trim(itemnames(i)),self%derived%item(num_derived),time,clock,__RC__)
       end if
       call ESMF_StateGet(Export,trim(itemnames(i)),field,__RC__)
       call MAPL_StateAdd(self%ExtDataState,field,__RC__)
@@ -778,7 +777,7 @@ CONTAINS
       doUpdate(i) = doUpdate_ .or. (.not.hasRun)
       call MAPL_TimerOff(MAPLSTATE,"--CheckUpd")
 
-      DO_UPDATE: if (doUpdate_) then
+      DO_UPDATE: if (doUpdate(i)) then
  
          call item%modelGridFields%comp1%reset()
          call item%filestream%get_file_bracket(time,item%source_time, item%modelGridFields%comp1,__RC__)

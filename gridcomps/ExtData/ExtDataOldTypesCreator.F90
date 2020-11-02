@@ -53,11 +53,12 @@ module MAPL_ExtDataOldTypesCreator
    end function new_ExtDataOldTypesCreator
 
    
-   subroutine fillin_primary(this,item_name,primary_item,time,unusable,rc)
+   subroutine fillin_primary(this,item_name,primary_item,time,clock,unusable,rc)
       class(ExtDataOldTypesCreator), intent(inout) :: this
       character(len=*), intent(in) :: item_name
       type(PrimaryExport), intent(inout) :: primary_item
       type(ESMF_Time), intent(inout) :: time
+      type(ESMF_Clock), intent(inout) :: clock
       class(KeywordEnforcer), optional, intent(in) :: unusable
       integer, optional, intent(out) :: rc
 
@@ -122,7 +123,7 @@ module MAPL_ExtDataOldTypesCreator
       allocate(primary_item%source_time,source=rule%source_time)
       ! new refresh
       call primary_item%update_freq%create_from_parameters(rule%refresh_time, &
-           rule%refresh_frequency, rule%refresh_offset, time, __RC__)
+           rule%refresh_frequency, rule%refresh_offset, time, clock, __RC__)
 
       disable_interpolation =  .not.rule%time_interpolation 
 
@@ -162,11 +163,12 @@ module MAPL_ExtDataOldTypesCreator
 
    end subroutine fillin_primary
 
-   subroutine fillin_derived(this,item_name,derived_item,time,unusable,rc)
+   subroutine fillin_derived(this,item_name,derived_item,time,clock,unusable,rc)
       class(ExtDataOldTypesCreator), intent(inout) :: this
       character(len=*), intent(in) :: item_name
       type(DerivedExport), intent(inout) :: derived_item
       type(ESMF_Time), intent(inout) :: time
+      type(ESMF_Clock), intent(inout) :: clock
       class(KeywordEnforcer), optional, intent(in) :: unusable
       integer, optional, intent(out) :: rc
 
@@ -177,7 +179,7 @@ module MAPL_ExtDataOldTypesCreator
       derived_item%name = trim(item_name)
       derived_item%expression = rule%expression
       call derived_item%update_freq%create_from_parameters(rule%refresh_time, &
-           rule%refresh_frequency, rule%refresh_offset, time, __RC__)
+           rule%refresh_frequency, rule%refresh_offset, time, clock,__RC__)
       !derived_item%refresh_template = rule%refresh_template
       derived_item%masking=.false.
       if (index(derived_item%expression,"mask") /= 0 ) then

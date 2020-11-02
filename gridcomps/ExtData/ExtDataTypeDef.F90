@@ -1,6 +1,5 @@
 module MAPL_ExtDataTypeDef
    use ESMF
-   use MAPL_SimpleAlarm
    use MAPL_newCFIOItemMod
    use MAPL_ExtDataBracket
    use MAPL_ExtDataPointerUpdate
