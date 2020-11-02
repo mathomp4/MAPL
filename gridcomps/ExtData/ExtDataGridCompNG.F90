@@ -506,22 +506,6 @@ CONTAINS
          cycle
       end if
  
-      ! check if this is a single piece of data if user put - for refresh template
-      ! by that it is an untemplated file with one time that could not possibly be time interpolated
-      if (PrimaryExportIsConstant_(item)) then
-         if (index(item%file,'%') == 0) then
-            call MakeMetadata(item%file,item%pfioCollection_id,metadata,__RC__)
-            call metadata%get_coordinate_info('time',coordSize=tsteps,__RC__)
-            if (tsteps == 1) then
-               item%cyclic = 'single'
-               call item%modelGridFields%comp1%set_parameters(disable_interpolation=.true.)
-               call item%modelGridFields%comp2%set_parameters(disable_interpolation=.true.)
-               call item%modelGridFields%auxiliary1%set_parameters(disable_interpolation=.true.)
-               call item%modelGridFields%auxiliary2%set_parameters(disable_interpolation=.true.)
-            end if
-         end if
-      end if
-
       ! get levels, other information
       call GetLevs(item,time,self%allowExtrap,__RC__)
       call ESMF_VMBarrier(vm)
@@ -778,7 +762,6 @@ CONTAINS
          Write(*,*) ' '
          Write(*,'(a,I0.3,a,I0.3,a,a)') 'ExtData Run_: READ_LOOP: variable ', i, ' of ', self%primary%nItems, ': ', trim(item%var)
          Write(*,*) '   ==> file: ', trim(item%file)
-         Write(*,*) '   ==> cyclic: ', trim(item%cyclic)
          Write(*,*) '   ==> isConst: ', item%isConst
       ENDIF
 
@@ -788,10 +771,6 @@ CONTAINS
          ENDIF
          cycle
       endif
-
-
-      NotSingle = .true.
-      if (trim(item%cyclic) == 'single') NotSingle = .false.
 
       call MAPL_TimerOn(MAPLSTATE,"--CheckUpd")
 

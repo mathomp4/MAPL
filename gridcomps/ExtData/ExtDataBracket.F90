@@ -17,6 +17,7 @@ module MAPL_ExtDataBracket
       real             :: scale_factor = 0.0
       real             :: offset = 0.0
       logical          :: disable_interpolation = .false.
+      logical          :: intermittent_disable = .false.
       logical          :: new_file_right
       logical          :: new_file_left
       contains
@@ -109,7 +110,7 @@ contains
    end subroutine get_node
 
 
-   subroutine set_parameters(this, unusable, scale_factor, offset, disable_interpolation, left_field, right_field, rc)
+   subroutine set_parameters(this, unusable, scale_factor, offset, disable_interpolation, left_field, right_field, intermittent_disable, rc)
       class(ExtDataBracket), intent(inout) :: this
       class(KeywordEnforcer), optional, intent(in) :: unusable
       real, optional, intent(in) :: scale_factor
@@ -117,6 +118,7 @@ contains
       logical, optional, intent(in) :: disable_interpolation
       type(ESMF_Field), optional, intent(in) :: left_field
       type(ESMF_Field), optional, intent(in) :: right_field
+      logical, optional, intent(in) :: intermittent_disable
       integer, optional, intent(out) :: rc
 
       _UNUSED_DUMMY(unusable)
@@ -125,6 +127,7 @@ contains
       if (present(disable_interpolation)) this%disable_interpolation = disable_interpolation
       if (present(left_field)) this%left_node%field=left_field
       if (present(right_field)) this%right_node%field=right_field
+      if (present(intermittent_disable)) this%intermittent_disable = intermittent_disable
       _RETURN(_SUCCESS)
 
    end subroutine set_parameters
@@ -179,7 +182,7 @@ contains
 
       call ESMF_FieldGet(field,dimCount=field_rank,__RC__)
       alpha = 0.0
-      if (.not.this%disable_interpolation) then
+      if ( (.not.this%disable_interpolation) .and. (.not.this%intermittent_disable)) then
          tinv1 = time - this%left_node%time
          tinv2 = this%right_node%time - this%left_node%time
          alpha = tinv1/tinv2
