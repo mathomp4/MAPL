@@ -44,9 +44,6 @@ contains
 
       call config%get(data_set%file_template,"file_template",default='',is_present=is_present,rc=status)
       _VERIFY(status)
-      if (index(data_set%file_template,"/dev/null")/=0) then
-         _RETURN(_SUCCESS)
-      end if
       call config%get(file_frequency,"file_frequency",default='',rc=status)
       _VERIFY(status)
       if (file_frequency /= '') then

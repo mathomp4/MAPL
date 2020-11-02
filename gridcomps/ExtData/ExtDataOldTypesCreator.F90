@@ -134,9 +134,12 @@ module MAPL_ExtDataOldTypesCreator
 
       ! file_template
       primary_item%isConst = .false.
-      dataset => this%file_stream_map%at(trim(rule%file_template_key))
-      primary_item%file = dataset%file_template
-
+      if (index(rule%file_template_key,"/dev/null")==0) then
+         dataset => this%file_stream_map%at(trim(rule%file_template_key))
+         primary_item%file = dataset%file_template
+      else
+         primary_item%file = rule%file_template_key
+      end if
       if (index(primary_item%file,'/dev/null') /= 0) then
          primary_item%isConst = .true.
          semi_pos = index(primary_item%file,':')
@@ -156,8 +159,10 @@ module MAPL_ExtDataOldTypesCreator
       end if
 
       !legacy
-      primary_item%frequency=dataset%frequency
-      primary_item%reff_time=dataset%reff_time
+      if (.not.primary_item%isConst) then
+         primary_item%frequency=dataset%frequency
+         primary_item%reff_time=dataset%reff_time
+      end if
 
       _RETURN(_SUCCESS)
 
