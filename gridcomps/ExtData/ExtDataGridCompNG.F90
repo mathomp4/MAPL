@@ -1921,29 +1921,6 @@ CONTAINS
 
  END SUBROUTINE MAPL_ExtDataExtractIntegers
 
-  function MAPL_ExtDataGetFStartTime(item,fname, rc) result(stime)
-
-     type(PrimaryExport), intent(in) :: item
-     character(len=*), intent(in   ) :: fname
-     integer, optional, intent(out  ) :: rc
-
-     type(ESMF_Time) :: stime
-
-     integer                               :: status
-
-     integer :: iyr,imm,idd,ihr,imn,isc
-     type(FileMetadataUtils), pointer :: metadata => null()
-
-     call MakeMetadata(fname,item%pfiocollection_id,metadata,__RC__)
-     call Metadata%get_time_info(startyear=iyr,startmonth=imm,startday=idd,starthour=ihr,startmin=imn,startsec=isc,rc=status)
-     _VERIFY(status)
-     call ESMF_TimeSet(sTime, yy=iyr, mm=imm, dd=idd,  h=ihr,  m=imn, s=isc, __RC__)
-     nullify(metadata)
-
-     _RETURN(ESMF_SUCCESS)
-
-  end function MAPL_ExtDataGetFStartTime
-
   function MAPL_ExtDataGridChangeLev(Grid,CF,lm,rc) result(NewGrid)
 
      type(ESMF_Grid), intent(inout) :: Grid
