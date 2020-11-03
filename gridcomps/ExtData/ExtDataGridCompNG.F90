@@ -2405,22 +2405,4 @@ CONTAINS
 
   end subroutine IOBundle_Add_Entry
 
-  !subroutine set_bracket_time(item,left_time,right_time)
-     !type(PrimaryExport), intent(inout) :: item
-     !type(ESMF_Time), optional, intent(inout) :: left_time
-     !type(ESMF_Time), optional, intent(inout) :: right_time
-     !if (present(left_time)) then
-        !call item%modelGridFields%comp1%set_parameters(left_time=left_time)
-        !call item%modelGridFields%comp2%set_parameters(left_time=left_time)
-        !call item%modelGridFields%auxiliary1%set_parameters(left_time=left_time)
-        !call item%modelGridFields%auxiliary2%set_parameters(left_time=left_time)
-     !end if
-     !if (present(right_time)) then
-        !call item%modelGridFields%comp1%set_parameters(right_time=right_time)
-        !call item%modelGridFields%comp2%set_parameters(right_time=right_time)
-        !call item%modelGridFields%auxiliary1%set_parameters(right_time=right_time)
-        !call item%modelGridFields%auxiliary2%set_parameters(right_time=right_time)
-     !end if
-  !end subroutine set_bracket_time
-
  END MODULE MAPL_ExtDataGridCompNG

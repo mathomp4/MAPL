@@ -64,7 +64,7 @@ contains
       this%frequency = file_series%frequency
       this%reff_time = file_series%reff_time
       allocate(this%valid_range,source=file_series%valid_range)
-      this%collection_id = MAPL_ExtDataAddCollection(this%file_template)
+      this%collection_id = file_series%collection_id
       if (present(persist_closest)) then
          this%persist_closest = persist_closest
       else
