@@ -9,6 +9,8 @@ module MAPL_ExtDataFileStream
    use MAPL_ExtDataCollectionMod
    use MAPL_CollectionVectorMod
    use MAPL_ExtDataCollectionManagerMod
+   use MAPL_FileMetadataUtilsMod
+   use MAPL_StringTemplate
    implicit none
    private
 
@@ -18,6 +20,9 @@ module MAPL_ExtDataFileStream
       type(ESMF_Time) :: reff_time
       integer :: collection_id
       type(ESMF_Time), allocatable :: valid_range(:)
+      type(FileMetaData) :: metadata
+      contains
+         procedure :: detect_metadata
    end type
 
    interface ExtDataFileStream
@@ -113,6 +118,48 @@ contains
       _RETURN(_SUCCESS)
 
    end function new_ExtDataFileStream_from_yaml
+
+   subroutine detect_metadata(this,metadata_out,time,get_range,rc)
+      class(ExtDataFileStream), intent(inout) :: this
+      type(FileMetadataUtils), intent(inout) :: metadata_out
+      type(ESMF_Time),          intent(in)  :: time
+      logical, optional, intent(in)  :: get_range
+      integer, optional, intent(out) :: rc
+
+      logical :: get_range_      
+      type(MAPLExtDataCollection), pointer :: collection
+      type(FileMetadataUtils), pointer :: metadata
+      type(ESMF_Time), allocatable :: time_series(:)
+      integer :: status
+      character(len=ESMF_MAXPATHLEN) :: filename
+
+      if (present(get_range)) then
+         get_range_ = get_range
+      else
+         get_range_ = .false.
+      end if
+
+      collection => ExtDataCollections%at(this%collection_id)
+      if (get_range_ .and. (.not.allocated(this%valid_range))) then
+         if (index('%',this%file_template) == 0) then
+            metadata => collection%find(this%file_template)
+            call metadata%get_time_info(timeVector=time_series,__RC__)
+            allocate(this%valid_range(2))
+            this%valid_range(1)=time_series(1)
+            this%valid_range(2)=time_series(size(time_series))
+         end if
+      end if
+
+      if (get_range_) then
+         call fill_grads_template(filename,this%file_template,time=this%valid_range(1),__RC__)
+      else
+         call fill_grads_template(filename,this%file_template,time=time,__RC__)
+      end if
+      metadata => collection%find(filename,__RC__)
+      metadata_out = metadata
+      _RETURN(_SUCCESS)
+
+   end subroutine detect_metadata
 
 end module MAPL_ExtDataFileStream
 

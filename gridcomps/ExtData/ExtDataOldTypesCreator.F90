@@ -95,7 +95,7 @@ module MAPL_ExtDataOldTypesCreator
       ! units
       primary_item%units = ''
       ! climatology
-      primary_item%cyclic = 'n' !ESMF_UtilStringLowerCase(trim(rule%climatology))
+      !primary_item%cyclic = 'n' !ESMF_UtilStringLowerCase(trim(rule%climatology))
       ! regrid method
       if (trim(rule%regrid_method) == "REGRID_METHOD_BILINEAR") then
          primary_item%trans = REGRID_METHOD_BILINEAR
@@ -137,14 +137,15 @@ module MAPL_ExtDataOldTypesCreator
       if (index(rule%file_template_key,"/dev/null")==0) then
          dataset => this%file_stream_map%at(trim(rule%file_template_key))
          primary_item%file = dataset%file_template
+         call dataset%detect_metadata(primary_item%file_metadata,time,get_range=(trim(rule%extrap_outside) /= "none"),__RC__)
       else
          primary_item%file = rule%file_template_key
       end if
-      if (index(primary_item%file,'/dev/null') /= 0) then
+      if (index(rule%file_template_key,'/dev/null') /= 0) then
          primary_item%isConst = .true.
-         semi_pos = index(primary_item%file,':')
+         semi_pos = index(rule%file_template_key,':')
          if (semi_pos > 0) then
-            read(primary_item%file(semi_pos+1:),*)primary_item%const
+            read(rule%file_template_key(semi_pos+1:),*)primary_item%const
          else
             primary_item%const=0.0
          end if
@@ -156,12 +157,6 @@ module MAPL_ExtDataOldTypesCreator
             call simple_handler%initialize(dataset,persist_closest=primary_item%persist_closest,__RC__)
             allocate(primary_item%filestream,source=simple_handler)
          end if
-      end if
-
-      !legacy
-      if (.not.primary_item%isConst) then
-         primary_item%frequency=dataset%frequency
-         primary_item%reff_time=dataset%reff_time
       end if
 
       _RETURN(_SUCCESS)

@@ -218,6 +218,7 @@ module MAPL_FileMetadataUtilsMod
          allocate(timeVector,source=tVec,stat=status)
          _VERIFY(status)
       end if
+      _RETURN(_SUCCESS)
 
    end subroutine get_time_info
  

@@ -4,7 +4,7 @@ module MAPL_ExtDataTypeDef
    use MAPL_ExtDataBracket
    use MAPL_ExtDataPointerUpdate
    use MAPL_ExtDataAbstractFileHandler
-
+   use MAPL_FileMetadataUtilsMod
    implicit none
 
    public PrimaryExport
@@ -25,20 +25,15 @@ module MAPL_ExtDataTypeDef
   type PrimaryExport
      character(len=ESMF_MAXSTR)   :: name
      character(len=ESMF_MAXSTR)   :: units
-     character(len=ESMF_MAXSTR)   :: cyclic
      integer                      :: Trans
      character(len=ESMF_MAXSTR)   :: var
-     character(len=ESMF_MAXPATHLEN)   :: file
+     character(len=ESMF_MAXPATHLEN)   :: file ! remove
 
      logical                      :: isConst
-     real                         :: Const
+     real                         :: Const !remove
      integer                      :: vartype ! MAPL_FieldItem or MAPL_BundleItem
 
      class(ExtDataAbstractFileHandler), allocatable :: filestream
-
-     type(ESMF_FieldBundle)       :: binterp1, binterp2
-     type(ESMF_TimeInterval)      :: frequency
-     type(ESMF_Time)              :: reff_time
 
      ! if primary export represents a pair of vector fields
      logical                      :: isVector
@@ -58,6 +53,7 @@ module MAPL_ExtDataTypeDef
      ! do we have to do vertical interpolation
      logical                      :: do_VertInterp = .false.
      logical                      :: do_Fill = .false.
+     type(FileMetadataUtils)      :: file_metadata
      integer                      :: LM
      real, allocatable            :: levs(:)
      character(len=4)             :: importVDir = "down"

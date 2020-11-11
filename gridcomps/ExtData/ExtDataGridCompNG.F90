@@ -506,7 +506,7 @@ CONTAINS
       end if
  
       ! get levels, other information
-      call GetLevs(item,time,self%allowExtrap,__RC__)
+      call GetLevs(item,__RC__)
       call ESMF_VMBarrier(vm)
       ! register collections
       item%iclient_collection_id=i_clients%add_ext_collection(trim(item%file))
@@ -1136,103 +1136,39 @@ CONTAINS
 
      end function timestamp_
     
-     subroutine GetLevs(item, time, allowExtrap, rc)
+     subroutine GetLevs(item, rc)
 
         type(PrimaryExport)      , intent(inout) :: item
-        type(ESMF_Time)          , intent(inout) :: time
-        logical                  , intent(in   ) :: allowExtrap
         integer, optional        , intent(out  ) :: rc
 
         integer :: status
 
-        integer(ESMF_KIND_I4)      :: iyr,imm,idd,ihr,imn,iss,i,n,refYear
         character(len=ESMF_MAXPATHLEN) :: file
-        integer                    :: nymd, nhms
-        type(ESMF_Time)            :: fTime
         real, allocatable          :: levFile(:) 
         character(len=ESMF_MAXSTR) :: buff,levunits,tlevunits
-        logical                    :: found,lFound,intOK
-        integer                    :: maxOffset
         character(len=:), allocatable :: levname
         character(len=:), pointer :: positive 
-        type(FileMetadataUtils), pointer :: metadata
         type(Variable), pointer :: var
         type(ESMF_TimeInterval)    :: zero
+        integer :: i
 
         positive=>null()
-
-        call ESMF_TimeIntervalSet(zero,__RC__)
-
-        if (item%frequency == zero) then
-
-           file = item%file
-           Inquire(file=trim(file),EXIST=found)
-
-        else
-           ftime = time
-
-           if (item%cycling) then
-              ftime=item%reff_time
-           end if
-           call ESMF_TimeGet(fTime,yy=iyr,mm=imm,dd=idd,h=ihr,m=imn,s=iss,__RC__)
-           call MAPL_PackTime(nymd,iyr,imm,idd)
-           call MAPL_PackTime(nhms,ihr,imn,iss)
-           call fill_grads_template(file,item%file,nymd=nymd,nhms=nhms,__RC__)
-           Inquire(file=trim(file),EXIST=found)
-
-        end if
-
-        if (found) then
-           call MakeMetadata(file,item%pfioCollection_id,metadata,__RC__)
-        else
-           if (allowExtrap .and. (item%cyclic == 'n') ) then
-
-              ftime = item%reff_time
-              n = 0
-              maxOffSet = 100
-              call ESMF_TimeGet(item%reff_time,yy=refYear)
-              lfound = .false.
-              intOK = .true.
-              do while (intOK .and. (.not.lfound))
-                 call ESMF_TimeGet(fTime,yy=iyr,mm=imm,dd=idd,h=ihr,m=imn,s=iss,__RC__)
-                 call MAPL_PackTime(nymd,iyr,imm,idd)
-                 call MAPL_PackTime(nhms,ihr,imn,iss)
-                 call fill_grads_template(file,item%file,nymd=nymd,nhms=nhms,__RC__)
-                 Inquire(file=trim(file),exist=lfound)
-                 intOK = (abs(iYr-refYear)<maxOffset)
-                 if (.not.lfound) then
-                    n = n + 1
-                    ftime = ftime + item%frequency
-                 else
-                    call MakeMetadata(file,item%pfioCollection_id,metadata,__RC__)
-                 end if
-              enddo
-
-              if (.not.lfound) then
-                 _ASSERT(.false., 'From ' // trim(item%file) // ' could not find file with extrapolation')
-              end if
-           else
-              _ASSERT(.false.,'From ' // trim(item%file) // ' could not find time no extrapolation')
-           end if
-
-        end if
-
         var => null()
         if (item%isVector) then
-           var=>metadata%get_variable(trim(item%fcomp1))
+           var=>item%file_metadata%get_variable(trim(item%fcomp1))
            _ASSERT(associated(var),"Variable "//TRIM(item%fcomp1)//" not found in file "//TRIM(item%file))
            var => null()
-           var=>metadata%get_variable(trim(item%fcomp2))
+           var=>item%file_metadata%get_variable(trim(item%fcomp2))
            _ASSERT(associated(var),"Variable "//TRIM(item%fcomp2)//" not found in file "//TRIM(item%file))
         else
-           var=>metadata%get_variable(trim(item%var))
+           var=>item%file_metadata%get_variable(trim(item%var))
            _ASSERT(associated(var),"Variable "//TRIM(item%var)//" not found in file "//TRIM(item%file))
         end if
    
-        levName = metadata%get_level_name(rc=status)
+        levName = item%file_metadata%get_level_name(rc=status)
         _VERIFY(status)
         if (trim(levName) /='') then
-           call metadata%get_coordinate_info(levName,coordSize=item%lm,coordUnits=tLevUnits,coords=levFile,__RC__)
+           call item%file_metadata%get_coordinate_info(levName,coordSize=item%lm,coordUnits=tLevUnits,coords=levFile,__RC__)
            levUnits=MAPL_TrimString(tlevUnits)
            ! check if pressure
            item%levUnit = ESMF_UtilStringLowerCase(levUnits)
@@ -1242,7 +1178,7 @@ CONTAINS
            if (item%havePressure) then
               if (levFile(1)>levFile(size(levFile))) item%fileVDir="up"
            else
-              positive => metadata%get_variable_attribute(levName,'positive',__RC__)
+              positive => item%file_metadata%get_variable_attribute(levName,'positive',__RC__)
               if (associated(positive)) then
                  if (MAPL_TrimString(positive)=='up') item%fileVDir="up"
               end if
@@ -1257,10 +1193,10 @@ CONTAINS
            end if
            if (trim(item%levunit)=='hpa') item%levs=item%levs*100.0
            if (item%isVector) then
-              item%units = metadata%get_variable_attribute(trim(item%fcomp1),"units",rc=status)
+              item%units = item%file_metadata%get_variable_attribute(trim(item%fcomp1),"units",rc=status)
               _VERIFY(status)
            else
-              item%units = metadata%get_variable_attribute(trim(item%var),"units",rc=status)
+              item%units = item%file_metadata%get_variable_attribute(trim(item%var),"units",rc=status)
               _VERIFY(status)
            end if
 
@@ -2083,13 +2019,13 @@ CONTAINS
               end if
            end if
         else if (present(bundle)) then
-           if (Bside == MAPL_ExtDataLeft) then 
-              bundle = item%binterp1
-              _RETURN(ESMF_SUCCESS)
-           else if (Bside == MAPL_ExtDataRight) then 
-              bundle = item%binterp2
-              _RETURN(ESMF_SUCCESS)
-           end if
+           !if (Bside == MAPL_ExtDataLeft) then 
+              !bundle = item%binterp1
+              !_RETURN(ESMF_SUCCESS)
+           !else if (Bside == MAPL_ExtDataRight) then 
+              !bundle = item%binterp2
+              !_RETURN(ESMF_SUCCESS)
+           !end if
 
         end if
 
