@@ -1,5 +1,5 @@
 #include "MAPL_ErrLog.h"
-module MAPL_ExtDataYamlConfig
+module MAPL_ExtDataConfig
    use ESMF
    use yaFyaml
    use gFTL_StringVector
@@ -14,25 +14,24 @@ module MAPL_ExtDataYamlConfig
    implicit none
    private
 
-   type, public :: ExtDataYamlConfig
+   type, public :: ExtDataConfig
       integer :: debug
       type(ExtDataRuleMap) :: rule_map
       type(ExtDataDerivedMap) :: derived_map
       type(ExtDataFileStreamMap) :: file_stream_map
+      
       contains
          procedure :: name_in_config
          procedure :: count_number
          procedure :: get_debug_flag
+         procedure :: new_ExtDataConfig_from_yaml
    end type
-
-   interface ExtDataYamlConfig
-      module procedure new_ExtDataYamlConfig_from_yaml
-   end interface
 
 contains
 
-   recursive subroutine new_ExtDataYamlConfig_from_yaml(ext_config,config_file,current_time,unusable,rc) 
-      type(ExtDataYamlConfig), intent(inout), target :: ext_config
+   recursive subroutine new_ExtDataConfig_from_yaml(ext_config,config_file,current_time,unusable,rc) 
+      !type(ExtDataConfig), intent(inout), target :: ext_config
+      class(ExtDataConfig), intent(inout), target :: ext_config
       character(len=*), intent(in) :: config_file
       type(ESMF_Time), intent(in) :: current_time
       class(KeywordEnforcer), optional, intent(in) :: unusable
@@ -61,7 +60,7 @@ contains
 
       subconfigs = config%at("subconfigs")
       do i=1,subconfigs%size()
-         call new_ExtDataYamlConfig_from_yaml(ext_config,subconfigs%at(i),current_time,rc=status)
+         call new_ExtDataConfig_from_yaml(ext_config,subconfigs%at(i),current_time,rc=status)
          _VERIFY(status)
       enddo
 
@@ -115,10 +114,10 @@ contains
       _VERIFY(status)
 
       _RETURN(_SUCCESS)
-   end subroutine new_ExtDataYamlConfig_from_yaml
+   end subroutine new_ExtDataConfig_from_yaml
 
    logical function name_in_config(this,item_name,unusable,rc)
-      class(ExtDataYamlConfig), intent(inout) :: this
+      class(ExtDataConfig), intent(inout) :: this
       character(len=*), intent(in) :: item_name
       class(KeywordEnforcer), optional, intent(in) :: unusable
       integer, optional, intent(out) :: rc
@@ -143,7 +142,7 @@ contains
    end function name_in_config
 
    subroutine count_number(this, item_name,primary_number,derived_number,unusable,rc) 
-      class(ExtDataYamlConfig), intent(inout) :: this
+      class(ExtDataConfig), intent(inout) :: this
       integer, intent(out) :: primary_number,derived_number
       character(len=*), intent(in) :: item_name
       class(KeywordEnforcer), optional, intent(in) :: unusable
@@ -173,8 +172,8 @@ contains
    end subroutine count_number
  
    integer function get_debug_flag(this)
-      class(ExtDataYamlConfig), intent(inout) :: this
+      class(ExtDataConfig), intent(inout) :: this
       get_debug_flag=this%debug
    end function get_debug_flag 
 
-end module MAPL_ExtDataYamlConfig
+end module MAPL_ExtDataConfig

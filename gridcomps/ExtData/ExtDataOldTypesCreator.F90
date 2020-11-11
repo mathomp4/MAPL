@@ -8,7 +8,7 @@ module MAPL_ExtDataOldTypesCreator
    use MAPL_KeywordEnforcerMod
    use MAPL_ExceptionHandling
    use MAPL_ExtDataTypeDef
-   use MAPL_ExtDataYamlConfig
+   use MAPL_ExtDataConfig
    use MAPL_ExtDataFileStream
    use MAPL_ExtDataFileStreamMap
    use MAPL_ExtDataRule
@@ -22,7 +22,7 @@ module MAPL_ExtDataOldTypesCreator
    implicit none
    public :: ExtDataOldTypesCreator
 
-   type, extends(ExtDataYamlConfig) :: ExtDataOldTypesCreator
+   type, extends(ExtDataConfig) :: ExtDataOldTypesCreator
       private
       contains
          procedure :: fillin_primary
@@ -46,7 +46,7 @@ module MAPL_ExtDataOldTypesCreator
       integer :: status
 
       _UNUSED_DUMMY(unusable)
-      call ExtDataYamlConfig(ExtDataObj%ExtDataYamlConfig,config_file,current_time,rc=status)
+      call ExtDataObj%ExtDataConfig%new_ExtDataConfig_from_yaml(config_file,current_time,rc=status)
       _VERIFY(status)
 
       _RETURN(_SUCCESS)

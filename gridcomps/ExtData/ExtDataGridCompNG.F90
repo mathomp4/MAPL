@@ -50,7 +50,7 @@
    use pFIO_ClientManagerMod, only : i_Clients
    use MAPL_newCFIOItemMod
    use MAPL_newCFIOItemVectorMod
-   use MAPL_ExtDataYamlConfig
+   use MAPL_ExtDataConfig
    use MAPL_ExtDataTypeDef
    use MAPL_ExtDataOldTypesCreator
    use MAPL_StringTemplate

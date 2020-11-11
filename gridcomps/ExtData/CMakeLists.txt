@@ -4,7 +4,7 @@ set (srcs
      ExtDataFileStream.F90
      ExtDataRule.F90
      ExtDataDerived.F90
-     ExtDataYamlConfig.F90
+     ExtDataConfig.F90
      ExtDataGridCompNG.F90
      TimeStringConversion.F90
      ExtDataTypeDef.F90
