@@ -62,8 +62,8 @@
 ! !PUBLIC MEMBER FUNCTIONS:
 
    PUBLIC SetServices
-   public T_EXTDATA_STATE
-   public EXTDATA_WRAP
+   public t_extdatang_state
+   public extdatang_wrap
 !EOP
 !
 ! !REVISION HISTORY:
@@ -112,10 +112,7 @@
      type(ESMF_State)     :: ExtDataState
      type(ESMF_Config)    :: CF
      logical              :: active
-     logical              :: ignoreCase
-     logical              :: AllowExtrap
      integer, allocatable :: PrimaryOrder(:)
-     logical              :: distributed_trans
   end type MAPL_ExtData_State
 
 ! Hook for the ESMF
@@ -124,16 +121,16 @@
      type (MAPL_ExtData_State), pointer :: PTR => null()
   end type MAPL_ExtData_WRAP
 
-  type T_EXTDATA_STATE
+  type t_extdatang_state
      type(ESMF_State)    :: expState
      type(ESMF_GridComp) :: gc
-  end type T_EXTDATA_STATE
+  end type t_extdatang_state
 
   ! Wrapper for extracting internal state
   ! -------------------------------------
-  type EXTDATA_WRAP
-     type (T_EXTDATA_STATE), pointer :: PTR
-  end type EXTDATA_WRAP
+  type extdatang_wrap
+     type (t_extdatang_state), pointer :: PTR
+  end type extdatang_wrap
 
 
 CONTAINS
@@ -360,10 +357,6 @@ CONTAINS
     ! set ExtData on by default, let user turn it off if they want
     call ESMF_ConfigGetAttribute(CF_master,self%active, Label='USE_EXTDATA:',default=.true.,rc=status)
 
-    ! set extdata to ignore case on variable names in files
-    call ESMF_ConfigGetAttribute(CF_master,caseSensitiveVarNames, Label='CASE_SENSITIVE_VARIABLE_NAMES:',default=.false.,rc=status)
-    self%ignoreCase = .not. caseSensitiveVarNames
-
     ! no need to run ExtData if there are no imports to fill
     if (ItemCount == 0) then
        self%active = .false.
@@ -433,7 +426,6 @@ CONTAINS
    end if
       
    ext_debug=config_yaml%get_debug_flag()
-   self%allowExtrap=.true.
    allocate(self%primary%item(PrimaryItemCount),__STAT__)
    allocate(self%derived%item(DerivedItemCount),__STAT__)
    self%primary%nitems = PrimaryItemCount
@@ -455,8 +447,6 @@ CONTAINS
    enddo
 !  note: handle case if variables in derived expression need to be allocated!
    
-   self%distributed_trans=.false.
-
    PrimaryLoop: do i = 1, self%primary%nItems
 
       item => self%primary%item(i)

@@ -17,8 +17,8 @@ module MAPL_CapGridCompMod
   use MAPL_ShmemMod
   use MAPL_HistoryGridCompMod, only : Hist_SetServices => SetServices
   use MAPL_HistoryGridCompMod, only : HISTORY_ExchangeListWrap
-  use MAPL_ExtDataGridCompMod, only : ExtData_SetServices => SetServices
-  use MAPL_ExtDataGridCompMod, only : T_EXTDATA_STATE, EXTDATA_WRAP
+  use MAPL_ExtDataGridCompNG, only : ExtData_SetServices => SetServices
+  use MAPL_ExtDataGridCompNG, only : T_EXTDATANG_STATE, EXTDATANG_WRAP
   use MAPL_CFIOServerMod
   use MAPL_ConfigMod
   use MAPL_DirPathMod
@@ -152,8 +152,8 @@ contains
 
     integer :: status
 
-    type (T_ExtData_STATE), pointer       :: ExtData_internal_state => null()
-    type (ExtData_wrap)                   :: wrap
+    type (T_EXTDATANG_STATE), pointer       :: ExtData_internal_state => null()
+    type (EXTDATANG_WRAP)                   :: wrap
 
 
     character(len=ESMF_MAXSTR )           :: timerModeStr

@@ -52,7 +52,7 @@ endif()
 
 esma_add_library(
   ${this} SRCS ${srcs}
-  DEPENDENCIES MAPL.shared MAPL.profiler MAPL.pfio MAPL_cfio_r4 pflogger gftl-shared MPI::MPI_Fortran)
+  DEPENDENCIES MAPL.gridcomps MAPL.shared MAPL.profiler MAPL.pfio MAPL_cfio_r4 pflogger gftl-shared MPI::MPI_Fortran)
 
 target_compile_options (${this} PRIVATE $<$<COMPILE_LANGUAGE:Fortran>:${OpenMP_Fortran_FLAGS}>)
 if(DISABLE_GLOBAL_NAME_WARNING)

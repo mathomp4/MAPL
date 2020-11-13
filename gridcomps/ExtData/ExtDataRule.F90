@@ -52,9 +52,8 @@ contains
       _VERIFY(status)
       _ASSERT(is_present,"Missing file_template_key in ExtDataRule")
 
-      call config%get(rule%file_var,"file_var",default='',is_present=is_present,rc=status)
+      call config%get(rule%file_var,"file_var",default='missing_variable',rc=status)
       _VERIFY(status)
-      _ASSERT(is_present,"Missing file_var in ExtDataRule")
 
       call config%get(rule%extrap_outside,"extrap",default='none',rc=status)
       _VERIFY(status)
