@@ -22,6 +22,7 @@ module MAPL_CapGridCompMod
   use MAPL_CFIOServerMod
   use MAPL_ConfigMod
   use MAPL_DirPathMod
+  use MAPL_KeywordEnforcerMod
   use pFIO
   use gFTL_StringVector
   use pflogger, only: logging, Logger
@@ -74,6 +75,9 @@ module MAPL_CapGridCompMod
      procedure :: destroy_state
      procedure :: get_field_from_import
      procedure :: get_field_from_internal
+     procedure :: set_grid
+     procedure :: inject_external_grid
+     procedure :: set_clock
   end type MAPL_CapGridComp
 
   type :: MAPL_CapGridComp_Wrapper
@@ -179,6 +183,7 @@ contains
     character(len=ESMF_MAXSTR )           :: DYCORE
     character(len=ESMF_MAXPATHLEN) :: user_dirpath,tempString
     logical                      :: tend,foundPath
+    logical                      :: cap_clock_is_present
 
 
     type (MAPL_MetaComp), pointer :: maplobj
@@ -230,6 +235,18 @@ contains
        _VERIFY(status)
     end if
 
+    ! Check if a valid clock was provided externally
+    !-----------------------------------------------
+
+    call ESMF_GridCompGet(gc, clockIsPresent=cap_clock_is_present, rc=status)
+    _VERIFY(status)
+
+    if (cap_clock_is_present) then
+        call ESMF_GridCompGet(gc, clock=cap%clock, rc=status)
+        _VERIFY(status)
+        call ESMF_ClockValidate(cap%clock, rc=status)
+        _VERIFY(status)
+    else
     !  Create Clock. This is a private routine that sets the start and 
     !   end times and the time interval of the clock from the configuration.
     !   The start time is temporarily set to 1 interval before the time in the
@@ -238,11 +255,13 @@ contains
     !   were after the last advance before the previous Finalize.
     !---------------------------------------------------------------------------
 
-    call MAPL_ClockInit(MAPLOBJ, cap%clock, nsteps, rc = status)
-    _VERIFY(status)
-    cap%nsteps = nsteps    
-    call ESMF_ClockGet(cap%clock,currTime=cap%cap_restart_time,rc=status)
-    _VERIFY(status)
+        call MAPL_ClockInit(MAPLOBJ, cap%clock, nsteps, rc = status)
+        _VERIFY(status)
+        cap%nsteps = nsteps
+        call ESMF_ClockGet(cap%clock,currTime=cap%cap_restart_time,rc=status)
+        _VERIFY(status)
+    end if
+
     cap%clock_hist = ESMF_ClockCreate(cap%clock, rc = STATUS )  ! Create copy for HISTORY
     _VERIFY(STATUS)
 
@@ -277,38 +296,40 @@ contains
     call ESMF_AlarmRingerOff(perpetual, rc = status)
     _VERIFY(status)
 
-    ! Set CLOCK for AGCM
-    ! ------------------
+    ! Set CLOCK for AGCM if not externally provided
+    ! ---------------------------------------------
 
-    call MAPL_GetResource(MAPLOBJ, cap%perpetual_year, label='PERPETUAL_YEAR:',  default = -999, rc = status)
-    _VERIFY(status)
-    call MAPL_GetResource(MAPLOBJ, cap%perpetual_month, label='PERPETUAL_MONTH:', default = -999, rc = status)
-    _VERIFY(status)
-    call MAPL_GetResource(MAPLOBJ, cap%perpetual_day, label='PERPETUAL_DAY:',   default = -999, rc = status)
-    _VERIFY(status)
-
-    cap%lperp = ((cap%perpetual_day /= -999) .or. (cap%perpetual_month /= -999) .or. (cap%perpetual_year  /= -999))
-
-    if (cap%perpetual_day /= -999) then
-       _ASSERT(cap%perpetual_month /= -999, 'Must specify a value for PERPETUAL_MONTH in cap.')
-       _ASSERT(cap%perpetual_year  /= -999, 'Must specify a value for PERPETUAL_YEAR in cap.')
-    endif
-
-    if (cap%lperp) then
-       if (cap%perpetual_year  /= -999) call lgr%info('Using Perpetual  Year: %i0', cap%perpetual_year)
-       if (cap%perpetual_month /= -999) call lgr%info('Using Perpetual Month: %i0', cap%perpetual_month)
-       if (cap%perpetual_day   /= -999) call lgr%info('Using Perpetual   Day: %i0', cap%perpetual_day)
-
-       call ESMF_ClockGet(cap%clock, name = clockname, rc = status)
-       clockname = trim(clockname) // '_PERPETUAL'
-       call ESMF_Clockset(cap%clock, name = clockname, rc = status)
-
-       call ESMF_ClockGet(cap%clock_hist, name = clockname, rc = status)
-       clockname = trim(clockname) // '_PERPETUAL'
-       call ESMF_Clockset(cap%clock_hist, name = clockname, rc = status)
-
-       call Perpetual_Clock(cap, rc=status)
+    if (.not.cap_clock_is_present) then
+       call MAPL_GetResource(MAPLOBJ, cap%perpetual_year, label='PERPETUAL_YEAR:',  default = -999, rc = status)
        _VERIFY(status)
+       call MAPL_GetResource(MAPLOBJ, cap%perpetual_month, label='PERPETUAL_MONTH:', default = -999, rc = status)
+       _VERIFY(status)
+       call MAPL_GetResource(MAPLOBJ, cap%perpetual_day, label='PERPETUAL_DAY:',   default = -999, rc = status)
+       _VERIFY(status)
+
+       cap%lperp = ((cap%perpetual_day /= -999) .or. (cap%perpetual_month /= -999) .or. (cap%perpetual_year  /= -999))
+
+       if (cap%perpetual_day /= -999) then
+          _ASSERT(cap%perpetual_month /= -999, 'Must specify a value for PERPETUAL_MONTH in cap.')
+          _ASSERT(cap%perpetual_year  /= -999, 'Must specify a value for PERPETUAL_YEAR in cap.')
+       endif
+
+       if (cap%lperp) then
+          if (cap%perpetual_year  /= -999) call lgr%info('Using Perpetual  Year: %i0', cap%perpetual_year)
+          if (cap%perpetual_month /= -999) call lgr%info('Using Perpetual Month: %i0', cap%perpetual_month)
+          if (cap%perpetual_day   /= -999) call lgr%info('Using Perpetual   Day: %i0', cap%perpetual_day)
+
+          call ESMF_ClockGet(cap%clock, name = clockname, rc = status)
+          clockname = trim(clockname) // '_PERPETUAL'
+          call ESMF_Clockset(cap%clock, name = clockname, rc = status)
+
+          call ESMF_ClockGet(cap%clock_hist, name = clockname, rc = status)
+          clockname = trim(clockname) // '_PERPETUAL'
+          call ESMF_Clockset(cap%clock_hist, name = clockname, rc = status)
+
+          call Perpetual_Clock(cap, rc=status)
+          _VERIFY(status)
+       endif
     endif
 
     !  Get configurable info to create HIST 
@@ -544,6 +565,12 @@ contains
 
     call MAPL_Get(MAPLOBJ, gcs = cap%gcs, gim = cap%child_imports, gex = cap%child_exports, rc = status)
     _VERIFY(status)
+
+
+    !  Inject grid to root child if grid has been set externally
+    !-----------------------------------------------------------
+
+    call cap%inject_external_grid(__RC__)
 
     ! Run as usual unless PRINTSPEC> 0 as set in CAP.rc. If set then
     ! model will not run completely and instead it will simply run MAPL_SetServices
@@ -1271,6 +1298,70 @@ contains
     _RETURN(_SUCCESS)
 
   end subroutine get_field_from_internal
+
+  subroutine set_grid(this, grid, unusable, rc)
+     class(MAPL_CapGridComp),          intent(inout) :: this
+     type(ESMF_Grid),                  intent(in   ) :: grid
+     class(KeywordEnforcer), optional, intent(in   ) :: unusable
+     integer,                optional, intent(  out) :: rc
+
+     integer :: status
+
+     _UNUSED_DUMMY(unusable)
+
+     call ESMF_GridCompSet(this%gc, grid=grid, __RC__)
+
+     _RETURN(_SUCCESS)
+  end subroutine set_grid
+
+  subroutine inject_external_grid(this, unusable, rc)
+     class(MAPL_CapGridComp),          intent(inout) :: this
+     class(KeywordEnforcer), optional, intent(in   ) :: unusable
+     integer,                optional, intent(  out) :: rc
+
+     type(ESMF_GridMatch_Flag) :: grid_match
+     type(ESMF_Grid)           :: cap_grid,            root_grid
+     logical                   :: cap_grid_is_present, root_grid_is_present
+     integer                   :: status
+
+     _UNUSED_DUMMY(unusable)
+
+     call ESMF_GridCompGet(this%gc, gridIsPresent=cap_grid_is_present, __RC__)
+
+     if (cap_grid_is_present) then
+        call ESMF_GridCompGet(this%gc, grid=cap_grid, __RC__)
+        call ESMF_GridValidate(cap_grid, __RC__)
+
+        call ESMF_GridCompGet(this%gcs(this%root_id), gridIsPresent=root_grid_is_present, __RC__)
+
+        if (root_grid_is_present) then
+           call ESMF_GridCompGet(this%gcs(this%root_id), grid=root_grid, __RC__)
+           call ESMF_GridValidate(root_grid, __RC__)
+
+           grid_match = ESMF_GridMatch(cap_grid, root_grid, __RC__)
+           _ASSERT(grid_match == ESMF_GRIDMATCH_EXACT, "Attempting to override root grid with non-matching external grid")
+        else
+            call ESMF_GridCompSet(this%gcs(this%root_id), grid=cap_grid, __RC__)
+        end if
+     end if
+
+     _RETURN(_SUCCESS)
+  end subroutine inject_external_grid
+
+  subroutine set_clock(this, clock, unusable, rc)
+     class(MAPL_CapGridComp),          intent(inout) :: this
+     type(ESMF_Clock),                 intent(in   ) :: clock
+     class(KeywordEnforcer), optional, intent(in   ) :: unusable
+     integer,                optional, intent(  out) :: rc
+
+     integer :: status
+
+     _UNUSED_DUMMY(unusable)
+
+     call ESMF_GridCompSet(this%gc, clock=clock, __RC__)
+
+     _RETURN(_SUCCESS)
+  end subroutine set_clock
 
   subroutine destroy_state(this, rc)
     class(MAPL_CapGridComp), intent(inout) :: this
