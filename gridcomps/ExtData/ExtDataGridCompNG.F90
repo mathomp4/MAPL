@@ -55,6 +55,7 @@
    use MAPL_ExtDataOldTypesCreator
    use MAPL_StringTemplate
    use pflogger, only: logging, Logger
+   use MAPL_ExtDataLogger
 
    IMPLICIT NONE
    PRIVATE
@@ -325,14 +326,14 @@ CONTAINS
    integer :: num_primary,num_derived
    integer, allocatable :: item_types(:)
    type(StringVector) :: unsatisfied_imports
-   class(logger), pointer :: lgr
+   !class(logger), pointer :: lgr
 
 !  Get my name and set-up traceback handle
 !  ---------------------------------------
    Iam = 'Initialize_'
    call ESMF_GridCompGet( GC, name=comp_name, config=CF_master, __RC__ )
    Iam = trim(comp_name) // '::' // trim(Iam)
-   call MAPL_GetLogger(gc, lgr, __RC__)
+   call MAPL_GetLogger(gc, extdata_lgr, __RC__)
 
 !  Extract relevant runtime information
 !  ------------------------------------
@@ -420,7 +421,7 @@ CONTAINS
    enddo
    if (unsatisfied_imports%size() > 0) then
       do i=1,unsatisfied_imports%size()
-         call lgr%error("In ExtData resource file, could not find: "//trim(unsatisfied_imports%at(i)))
+         call extdata_lgr%error("In ExtData resource file, could not find: "//trim(unsatisfied_imports%at(i)))
       enddo
       _FAIL("Unsatisfied imports in ExtData")
    end if
@@ -450,10 +451,6 @@ CONTAINS
    PrimaryLoop: do i = 1, self%primary%nItems
 
       item => self%primary%item(i)
-
-      IF ( (Ext_Debug > 0) .AND. MAPL_Am_I_Root() ) THEN
-         Write(*,*) 'ExtData Initialize_: PrimaryLoop: ', trim(item%name)
-      ENDIF
 
       item%pfioCollection_id = MAPL_ExtDataAddCollection(item%file)
 
@@ -604,6 +601,14 @@ CONTAINS
          self%primary%have_phis=.true.
       end if
    end if
+
+   call extdata_lgr%info('*******************************************************')
+   call extdata_lgr%info('** Variables to be provided by the ExtData Component **')
+   call extdata_lgr%info('*******************************************************')
+   do i = 1, ItemCount
+      call extdata_lgr%info('---- %i0.5~: %a', i, trim(ItemNames(i)))
+   end do
+   call extdata_lgr%info('*******************************************************\n')
 
 ! Clean up
 ! --------
@@ -763,8 +768,8 @@ CONTAINS
 
       call MAPL_TimerOn(MAPLSTATE,"--CheckUpd")
 
-      call item%update_freq%check_update(doUpdate_,time,time0,__RC__)
-      doUpdate(i) = doUpdate_ .or. (.not.hasRun)
+      call item%update_freq%check_update(doUpdate(i),time,time0,.not.hasRun,__RC__)
+      !doUpdate(i) = doUpdate_ .or. (.not.hasRun)
       call MAPL_TimerOff(MAPLSTATE,"--CheckUpd")
 
       DO_UPDATE: if (doUpdate(i)) then
@@ -878,8 +883,8 @@ CONTAINS
 
       derivedItem => self%derived%item(i)
 
-      call derivedItem%update_freq%check_update(doUpdate_,time,time0,__RC__)
-      doUpdate_ = doUpdate_ .or. (.not.hasRun)
+      call derivedItem%update_freq%check_update(doUpdate_,time,time0,.not.hasRun,__RC__)
+      !doUpdate_ = doUpdate_ .or. (.not.hasRun)
 
       if (doUpdate_) then
 
@@ -2317,6 +2322,7 @@ CONTAINS
             item%pfioCollection_id,item%iclient_collection_id,items,rc=status)
         _VERIFY(status)
         call IOBundles%push_back(io_bundle)
+        call extdata_lgr%info('update L with with: %a %i1 ',file,time_index)
      end if
      call item%modelGridFields%comp1%get_parameters('R',update=update,file=file,time_index=time_index)
      if (update) then    
@@ -2325,6 +2331,7 @@ CONTAINS
             item%pfioCollection_id,item%iclient_collection_id,items,rc=status)
         _VERIFY(status)
         call IOBundles%push_back(io_bundle)
+        call extdata_lgr%info('update R with with: %a %i1 ',file, time_index)
      end if
 
      _RETURN(ESMF_SUCCESS)

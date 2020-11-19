@@ -97,13 +97,13 @@ module MAPL_ExtDataOldTypesCreator
       ! climatology
       !primary_item%cyclic = 'n' !ESMF_UtilStringLowerCase(trim(rule%climatology))
       ! regrid method
-      if (trim(rule%regrid_method) == "REGRID_METHOD_BILINEAR") then
+      if (trim(rule%regrid_method) == "BILINEAR") then
          primary_item%trans = REGRID_METHOD_BILINEAR
-      else if (trim(rule%regrid_method) == "REGRID_METHOD_CONSERVE") then
+      else if (trim(rule%regrid_method) == "CONSERVE") then
          primary_item%trans = REGRID_METHOD_CONSERVE
-      else if (trim(rule%regrid_method) == "REGRID_METHOD_VOTE") then
+      else if (trim(rule%regrid_method) == "VOTE") then
          primary_item%trans = REGRID_METHOD_VOTE
-      else if (index(rule%regrid_method,"REGRID_METHOD_FRACTION;")>0) then
+      else if (index(rule%regrid_method,"FRACTION;")>0) then
          semi_pos = index(rule%regrid_method,";")
          read(rule%regrid_method(semi_pos+1:),*) primary_item%fracVal
          primary_item%trans = REGRID_METHOD_FRACTION

@@ -54,12 +54,14 @@ module MAPL_ExtDataPointerUpdate
 
    end subroutine create_from_parameters
 
-   subroutine check_update(this,do_update,working_time,current_time,rc)
+   subroutine check_update(this,do_update,working_time,current_time,first_time,rc)
       class(ExtDataPointerUpdate), intent(inout) :: this
       logical, intent(out) :: do_update
       type(ESMF_Time), intent(inout) :: working_time
       type(ESMF_Time), intent(inout) :: current_time
+      logical, intent(in) :: first_time
       integer, optional, intent(out) :: rc
+      type(ESMF_Time) :: previous_ring
 
       integer :: status
 
@@ -68,12 +70,19 @@ module MAPL_ExtDataPointerUpdate
          _RETURN(_SUCCESS)
       end if
       if (ESMF_AlarmIsCreated(this%update_alarm)) then
-         do_update = ESMF_AlarmIsRinging(this%update_alarm,__RC__)
+         if (first_time) then
+            call ESMF_AlarmGet(this%update_alarm,prevRingTime=previous_ring,__RC__)
+            working_time =previous_ring+this%offset
+            do_update = .true.
+         else
+            do_update = ESMF_AlarmIsRinging(this%update_alarm,__RC__)
+            working_time = current_time+this%offset
+         end if
       else
          do_update = .true.
          if (this%single_shot) this%disabled = .true.
+         working_time = current_time+this%offset
       end if
-      working_time = current_time+this%offset
 
    end subroutine check_update
 

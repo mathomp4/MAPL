@@ -47,9 +47,9 @@ contains
 
       _UNUSED_DUMMY(unusable)
 
-      call config%get(data_set%file_template,"file_template",default='',is_present=is_present,rc=status)
+      call config%get(data_set%file_template,"tmpl",default='',is_present=is_present,rc=status)
       _VERIFY(status)
-      call config%get(file_frequency,"file_frequency",default='',rc=status)
+      call config%get(file_frequency,"freq",default='',rc=status)
       _VERIFY(status)
       if (file_frequency /= '') then
          data_set%frequency = string_to_esmf_timeinterval(file_frequency)
@@ -75,7 +75,7 @@ contains
          end if
       end if
 
-      call config%get(file_reff_time,"file_reference_time",default='',rc=status)
+      call config%get(file_reff_time,"ref_time",default='',rc=status)
       _VERIFY(status)
       if (file_reff_time /= '') then
          data_set%reff_time = string_to_esmf_time(file_reff_time)

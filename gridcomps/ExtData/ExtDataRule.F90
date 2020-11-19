@@ -24,7 +24,6 @@ module MAPL_ExtDataRule
       character(:), allocatable :: vector_partner
       character(:), allocatable :: vector_component
       character(:), allocatable :: vector_file_partner
-      character(:), allocatable :: refresh_template !temporary to get working
       contains
          procedure :: split_vector
    end type
@@ -48,38 +47,35 @@ contains
     
       _UNUSED_DUMMY(unusable)
 
-      call config%get(rule%file_template_key,"file_template_key",default='',is_present=is_present,rc=status)
+      call config%get(rule%file_template_key,"file_key",default='',is_present=is_present,rc=status)
       _VERIFY(status)
       _ASSERT(is_present,"Missing file_template_key in ExtDataRule")
 
-      call config%get(rule%file_var,"file_var",default='missing_variable',rc=status)
+      call config%get(rule%file_var,"var",default='missing_variable',rc=status)
       _VERIFY(status)
 
       call config%get(rule%extrap_outside,"extrap",default='none',rc=status)
       _VERIFY(status)
 
-      call config%get(rule%scaling,"scaling",default=0.0,rc=status) 
+      call config%get(rule%scaling,"scale",default=0.0,rc=status) 
       _VERIFY(status)
 
       call config%get(rule%shift,"shift",default=0.0,rc=status)
       _VERIFY(status)
 
-      call config%get(rule%time_interpolation,"time_interpolation",default=.true.,rc=status)
+      call config%get(rule%time_interpolation,"tinterp",default=.true.,rc=status)
       _VERIFY(status)
 
-      call config%get(rule%regrid_method,"regrid_method",default='REGRID_METHOD_BILINEAR',rc=status)
+      call config%get(rule%regrid_method,"regrid",default='BILINEAR',rc=status)
       _VERIFY(status)
 
-      call config%get(rule%refresh_time,"update_reff_time",default='00',rc=status)
+      call config%get(rule%refresh_time,"upd_ref_time",default='00',rc=status)
       _VERIFY(status)
 
-      call config%get(rule%refresh_frequency,"update_frequency",default='PT0S',rc=status)
+      call config%get(rule%refresh_frequency,"upd_freq",default='PT0S',rc=status)
       _VERIFY(status)
 
-      call config%get(rule%refresh_offset,"update_offset",default='PT0S',rc=status)
-      _VERIFY(status)
-
-      call config%get(rule%refresh_template,"refresh_template",default='0',rc=status)
+      call config%get(rule%refresh_offset,"upd_offset",default='PT0S',rc=status)
       _VERIFY(status)
 
       call config%get(source_str,"source_time",default='',rc=status)
