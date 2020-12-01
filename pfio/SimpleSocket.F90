@@ -96,13 +96,15 @@ contains
       class (AbstractMessage), intent(in) :: message
       class (AbstractSocket),pointer :: connection
       integer, optional, intent(out) :: rc
+      integer :: status
 
       connection => this%visitor%get_connection()
       select type (connection)
       type is (SimpleSocket)
          if (allocated(connection%msg)) deallocate(connection%msg)
          allocate(connection%msg , source = message)
-         call connection%msg%dispatch(this%visitor)
+         call connection%msg%dispatch(this%visitor,rc=status)
+         _VERIFY(status)
       class default
          _ASSERT(.false.,"Simple should connect Simple")
       end select

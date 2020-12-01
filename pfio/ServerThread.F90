@@ -528,7 +528,7 @@ contains
       type (AddHistCollectionMessage), intent(in) :: message
       integer, optional, intent(out) :: rc
 
-      integer :: n
+      integer :: n,status
       type (HistoryCollection) :: hist_collection
       class(AbstractSocket),pointer :: connection
      
@@ -546,7 +546,8 @@ contains
       endif
 
       connection=>this%get_connection()      
-      call connection%send(IdMessage(n))
+      call connection%send(IdMessage(n),rc=status)
+      _VERIFY(status)
       _RETURN(_SUCCESS)
    end subroutine handle_AddHistCollection
 
@@ -588,12 +589,14 @@ contains
       type (HistoryCollection),pointer :: hist_collection
       class(AbstractSocket),pointer :: connection
       type (DummyMessage) :: handshake_msg
+      integer :: status
 
       hist_collection=>this%hist_collections%at(message%collection_id) 
       call hist_collection%ModifyMetadata(message%var_map)
 
       connection=>this%get_connection()
-      call connection%send(handshake_msg)
+      call connection%send(handshake_msg,rc=status)
+      _VERIFY(status)
 
       _RETURN(_SUCCESS)
    end subroutine handle_ModifyMetadata
@@ -780,9 +783,11 @@ contains
       real(kind=REAL64), pointer :: values_real64_1d(:)
 
       integer, allocatable :: start(:),count(:)
+      integer :: status
 
       hist_collection=>this%hist_collections%at(message%collection_id)
-      formatter =>hist_collection%find(message%file_name)
+      formatter =>hist_collection%find(message%file_name,rc=status)
+      _VERIFY(status)
  
       select type (message)
       type is (StageDataMessage)
