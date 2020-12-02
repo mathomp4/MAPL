@@ -1,4 +1,4 @@
-esma_set_this (OVERRIDE MAPL.gridcomps)
+esma_set_this (OVERRIDE MAPL.extdata)
 
 set (srcs
      ExtDataFileStream.F90

@@ -23,6 +23,8 @@ module MAPL_CapGridCompMod
   use MAPL_ConfigMod
   use MAPL_DirPathMod
   use MAPL_KeywordEnforcerMod
+  use MAPL_ExternalGridFactoryMod
+  use MAPL_GridManagerMod
   use pFIO
   use gFTL_StringVector
   use pflogger, only: logging, Logger
@@ -191,6 +193,7 @@ contains
     type(MAPL_CapGridComp), pointer :: cap
     class(BaseProfiler), pointer :: t_p
     class(Logger), pointer :: lgr
+    type(ESMF_Clock) :: cap_clock
 
     _UNUSED_DUMMY(import_state)
     _UNUSED_DUMMY(export_state)
@@ -242,10 +245,16 @@ contains
     _VERIFY(status)
 
     if (cap_clock_is_present) then
-        call ESMF_GridCompGet(gc, clock=cap%clock, rc=status)
+        call ESMF_GridCompGet(gc, clock=cap_clock, rc=status)
         _VERIFY(status)
-        call ESMF_ClockValidate(cap%clock, rc=status)
+        call ESMF_ClockValidate(cap_clock, rc=status)
         _VERIFY(status)
+        cap%clock = ESMF_ClockCreate(cap_clock, rc=status)
+        _VERIFY(status)
+        ! NOTE: We assume the MAPL components will only advance by
+        ! one time step when driven with an external clock.
+        !---------------------------------------------------------
+        cap%nsteps = 1
     else
     !  Create Clock. This is a private routine that sets the start and 
     !   end times and the time interval of the clock from the configuration.
@@ -258,9 +267,10 @@ contains
         call MAPL_ClockInit(MAPLOBJ, cap%clock, nsteps, rc = status)
         _VERIFY(status)
         cap%nsteps = nsteps
-        call ESMF_ClockGet(cap%clock,currTime=cap%cap_restart_time,rc=status)
-        _VERIFY(status)
     end if
+
+    call ESMF_ClockGet(cap%clock,currTime=cap%cap_restart_time,rc=status)
+    _VERIFY(status)
 
     cap%clock_hist = ESMF_ClockCreate(cap%clock, rc = STATUS )  ! Create copy for HISTORY
     _VERIFY(STATUS)
@@ -283,10 +293,17 @@ contains
     _VERIFY(status)
      _ASSERT(CoresPerNode <= npes, 'something impossible happened')
 
-    call ESMF_ConfigGetAttribute(cap%config, value = heartbeat_dt, Label = "HEARTBEAT_DT:", rc = status)
-    _VERIFY(status)
-    call ESMF_TimeIntervalSet(frequency, s = heartbeat_dt, rc = status)
-    _VERIFY(status)
+    if (cap_clock_is_present) then
+       call ESMF_ClockGet(cap%clock, timeStep=frequency, rc=status)
+       _VERIFY(status)
+       call ESMF_TimeIntervalGet(frequency, s=heartbeat_dt, rc=status)
+       _VERIFY(status)
+    else
+       call ESMF_ConfigGetAttribute(cap%config, value = heartbeat_dt, Label = "HEARTBEAT_DT:", rc = status)
+       _VERIFY(status)
+       call ESMF_TimeIntervalSet(frequency, s = heartbeat_dt, rc = status)
+       _VERIFY(status)
+    end if
 
     cap%heartbeat_dt = heartbeat_dt
 
@@ -1299,17 +1316,23 @@ contains
 
   end subroutine get_field_from_internal
 
-  subroutine set_grid(this, grid, unusable, rc)
+  subroutine set_grid(this, grid, unusable, lm, rc)
      class(MAPL_CapGridComp),          intent(inout) :: this
      type(ESMF_Grid),                  intent(in   ) :: grid
      class(KeywordEnforcer), optional, intent(in   ) :: unusable
+     integer,                optional, intent(in   ) :: lm
      integer,                optional, intent(  out) :: rc
 
-     integer :: status
+     type(ESMF_Grid)           :: mapl_grid
+     type(ExternalGridFactory) :: external_grid_factory
+     integer                   :: status
 
      _UNUSED_DUMMY(unusable)
 
-     call ESMF_GridCompSet(this%gc, grid=grid, __RC__)
+     external_grid_factory = ExternalGridFactory(grid=grid, lm=lm, __RC__)
+     mapl_grid = grid_manager%make_grid(external_grid_factory, __RC__)
+
+     call ESMF_GridCompSet(this%gc, grid=mapl_grid, __RC__)
 
      _RETURN(_SUCCESS)
   end subroutine set_grid
