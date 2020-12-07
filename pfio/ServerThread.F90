@@ -751,9 +751,11 @@ contains
       class(AbstractSocket),pointer :: connection
       type(LocalMemReference) :: mem_data_reference
       type(DummyMessage) :: handshake_msg
+      integer :: status
 
       connection=>this%get_connection()
-      call connection%send(handshake_msg)
+      call connection%send(handshake_msg,rc=status)
+      _VERIFY(status)
       call this%request_backlog%push_back(message)
 
       mem_data_reference=LocalMemReference(message%type_kind,message%count)

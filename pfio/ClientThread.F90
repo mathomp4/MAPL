@@ -348,7 +348,7 @@ contains
       class (AbstractDataReference), intent(in) :: data_reference
       integer, optional, intent(out) :: rc
 
-
+      integer :: status
       integer :: request_id
 
       class (AbstractMessage), pointer :: handshake_msg
@@ -363,7 +363,8 @@ contains
            var_name, &
            data_reference))
 
-      handshake_msg => connection%receive()
+      handshake_msg => connection%receive(rc=status)
+      _VERIFY(status)
       deallocate(handshake_msg)
       associate (id => request_id)
         ! the put call iSend
@@ -420,12 +421,17 @@ contains
       call connection%send(StageDoneMessage())
    end subroutine done_stage
 
-   subroutine done_collective_stage(this)
+   subroutine done_collective_stage(this, unusable, rc)
       class (ClientThread), intent(inout) :: this
       class(AbstractSocket),pointer :: connection
 
+      class (KeywordEnforcer), optional, intent(out) :: unusable
+      integer, optional, intent(out):: rc
+      integer :: status
+
       connection=>this%get_connection()
-      call connection%send(CollectiveStageDoneMessage())
+      call connection%send(CollectiveStageDoneMessage(),rc=status)
+      _VERIFY(status)
    end subroutine done_collective_stage
 
    subroutine wait(this, request_id)

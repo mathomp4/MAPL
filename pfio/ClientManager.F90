@@ -362,9 +362,11 @@ contains
       integer, optional, intent(out) :: rc
 
       type (ClientThread), pointer :: clientPtr
+      integer :: status
    
       clientPtr =>this%current()
-      call clientPtr%done_collective_stage()
+      call clientPtr%done_collective_stage(rc=status)
+      _VERIFY(status)
 
       _RETURN(_SUCCESS)
       _UNUSED_DUMMY(unusable)
