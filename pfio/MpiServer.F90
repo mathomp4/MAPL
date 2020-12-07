@@ -8,6 +8,7 @@ module pFIO_MpiServerMod
    use pFIO_AbstractDataReferenceMod
    use pFIO_AbstractServerMod
    use pFIO_BaseServerMod
+   use MPI
 
    implicit none
    private
@@ -44,6 +45,7 @@ contains
       class (ServerThread), pointer :: thread_ptr => null()
       integer :: i,client_size
       logical, allocatable :: mask(:)
+      integer :: status
 
       client_size = this%threads%size()
 
@@ -61,7 +63,10 @@ contains
 
             thread_ptr=>this%threads%at(i)
             !handle the message
-            call thread_ptr%run()
+            call thread_ptr%run(rc=status)
+            if (status/=0) then
+               call MPI_Abort(mpi_comm_world,0,status)
+            end if
             !delete the thread object if it terminates 
             if(thread_ptr%do_terminate()) then
                mask(i) = .true.
