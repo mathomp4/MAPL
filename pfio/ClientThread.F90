@@ -397,28 +397,49 @@ contains
       call connection%send(DoneMessage())
    end subroutine done
 
-   subroutine done_prefetch(this)
+   subroutine done_prefetch(this,unusable,rc)
       class (ClientThread), intent(inout) :: this
       class(AbstractSocket),pointer :: connection
 
-      connection=>this%get_connection()
-      call connection%send(PrefetchDoneMessage())
+      class (KeywordEnforcer), optional, intent(out) :: unusable
+      integer, optional, intent(out):: rc
+      integer :: status
+
+      connection=>this%get_connection(rc=status)
+      _VERIFY(status)
+      call connection%send(PrefetchDoneMessage(),rc=status)
+      _VERIFY(status)
+      _RETURN(_SUCCESS)
    end subroutine done_prefetch
 
-   subroutine done_collective_prefetch(this)
+   subroutine done_collective_prefetch(this,unusable,rc)
       class (ClientThread), intent(inout) :: this
       class(AbstractSocket),pointer :: connection
 
-      connection=>this%get_connection()
+      class (KeywordEnforcer), optional, intent(out) :: unusable
+      integer, optional, intent(out):: rc
+      integer :: status
+
+      connection=>this%get_connection(rc=status)
+      _VERIFY(status)
       call connection%send(CollectivePrefetchDoneMessage())
+      _VERIFY(status)
+      _RETURN(_SUCCESS)
    end subroutine done_collective_prefetch
 
-   subroutine done_stage(this)
+   subroutine done_stage(this,unusable,rc)
       class (ClientThread), intent(inout) :: this
       class(AbstractSocket),pointer :: connection
 
-      connection=>this%get_connection()
-      call connection%send(StageDoneMessage())
+      class (KeywordEnforcer), optional, intent(out) :: unusable
+      integer, optional, intent(out):: rc
+      integer :: status
+
+      connection=>this%get_connection(rc=status)
+      _VERIFY(status)
+      call connection%send(StageDoneMessage(),rc=status)
+      _VERIFY(status)
+      _RETURN(_SUCCESS)
    end subroutine done_stage
 
    subroutine done_collective_stage(this, unusable, rc)
@@ -429,9 +450,11 @@ contains
       integer, optional, intent(out):: rc
       integer :: status
 
-      connection=>this%get_connection()
+      connection=>this%get_connection(rc=status)
+      _VERIFY(status)
       call connection%send(CollectiveStageDoneMessage(),rc=status)
       _VERIFY(status)
+      _RETURN(_SUCCESS)
    end subroutine done_collective_stage
 
    subroutine wait(this, request_id)
