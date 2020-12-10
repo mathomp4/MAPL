@@ -307,16 +307,12 @@ CONTAINS
 
    type (ESMF_Field)                 :: field,left_field,right_field
    integer                           :: fieldRank, lm
-   type (ESMF_FieldBundle)           :: bundle
-   integer                           :: fieldcount
    type (ESMF_StateItem_Flag), pointer    :: ITEMTYPES(:)
    character(len=ESMF_MAXSTR), allocatable   :: ITEMNAMES(:)
 
-   type(FileMetadataUtils), pointer  :: metadata
    real, pointer                     :: ptr2d(:,:) => null()
    real, pointer                     :: ptr3d(:,:,:) => null()
-   logical           :: caseSensitiveVarNames
-   integer           :: idx,tsteps
+   integer           :: idx
    type(ESMF_VM) :: vm
    type(MAPL_MetaComp),pointer :: MAPLSTATE
 
@@ -686,8 +682,6 @@ CONTAINS
 
    logical                           :: doUpdate_
    character(len=ESMF_MAXPATHLEN)    :: file_processed
-   logical                           :: NotSingle
-   logical                           :: updateL, updateR, swap
    logical, allocatable              :: doUpdate(:)
    type(ESMF_Time), allocatable      :: useTime(:)
 
@@ -1138,13 +1132,11 @@ CONTAINS
 
         integer :: status
 
-        character(len=ESMF_MAXPATHLEN) :: file
         real, allocatable          :: levFile(:) 
-        character(len=ESMF_MAXSTR) :: buff,levunits,tlevunits
+        character(len=ESMF_MAXSTR) :: levunits,tlevunits
         character(len=:), allocatable :: levname
         character(len=:), pointer :: positive 
         type(Variable), pointer :: var
-        type(ESMF_TimeInterval)    :: zero
         integer :: i
 
         positive=>null()
@@ -1245,7 +1237,6 @@ CONTAINS
      type(ESMF_Time),     intent(in   ) :: time
      integer, optional,   intent(out  ) :: rc
 
-     character(len=ESMF_MAXSTR) :: Iam
      integer                    :: status
      type(ESMF_Field) :: field
 

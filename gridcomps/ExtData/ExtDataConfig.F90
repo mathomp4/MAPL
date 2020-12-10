@@ -30,7 +30,6 @@ module MAPL_ExtDataConfig
 contains
 
    recursive subroutine new_ExtDataConfig_from_yaml(ext_config,config_file,current_time,unusable,rc) 
-      !type(ExtDataConfig), intent(inout), target :: ext_config
       class(ExtDataConfig), intent(inout), target :: ext_config
       character(len=*), intent(in) :: config_file
       type(ESMF_Time), intent(in) :: current_time
@@ -48,8 +47,8 @@ contains
       character(len=:), allocatable :: uname,vname
       type(FileStream) :: fstream
       type(StringVector) :: subconfigs
-      logical :: is_present
       integer :: i
+      character(len=:), allocatable :: rule_key
 
       _UNUSED_DUMMY(unusable)
 
@@ -65,25 +64,26 @@ contains
       enddo
 
       ds_config = config%at("data_sets")
-      !_ASSERT(.not.ds_config%is_none(),"data_sets key not found in ExtData rc file")
       rule_config = config%at("rules")
-      !_ASSERT(.not.rule_config%is_none(),"rules key not found in ExtData rc file")
       derived_config = config%at("derived")
 
       iter = ds_config%begin()
       do while (iter /= ds_config%end())
          key => iter%key()
          subcfg = iter%value()
-         ds = ExtDataFileStream(subcfg,current_time)
+         call ds%fill_from_yaml(subcfg,current_time,rc=status)
+         _VERIFY(status)
          call ext_config%file_stream_map%insert(trim(key),ds)
          call iter%next()
       enddo
 
       iter = rule_config%begin()
       do while (iter /= rule_config%end())
+         call rule%set_defaults(rc=status)
+         _VERIFY(status)
          key => iter%key()
-         subcfg = iter%value()
-         rule = ExtDataRule(subcfg,rc=status)
+         rule_key="rules%"//key
+         call rule%append_from_yaml(config,rule_key,rc=status)
          _VERIFY(status)
          semi_pos = index(key,";")
          if (semi_pos > 0) then
@@ -101,9 +101,11 @@ contains
       if (.not.derived_config%is_none()) then
          iter = derived_config%begin()
          do while (iter /= derived_config%end())
+            call derived%set_defaults(rc=status)
+            _VERIFY(status)
             key => iter%key()
-            subcfg = iter%value()
-            derived = ExtDataDerived(subcfg,rc=status)
+            rule_key="derived%"//key
+             call derived%append_from_yaml(config,rule_key,rc=status) 
             _VERIFY(status)
             call ext_config%derived_map%insert(trim(key),derived)
             call iter%next()
@@ -122,11 +124,10 @@ contains
       class(KeywordEnforcer), optional, intent(in) :: unusable
       integer, optional, intent(out) :: rc
 
-      logical :: rule_present
-      logical :: derived_present
       type(ExtDataRule), pointer :: rule
       type(ExtDataDerived), pointer :: derived
 
+      _UNUSED_DUMMY(unusable)
       rule => this%rule_map%at(trim(item_name))
       if (associated(rule)) then
          name_in_config = .true.
@@ -150,6 +151,7 @@ contains
       type(ExtDataRule), pointer :: rule
       type(ExtDataDerived), pointer :: derived
 
+      _UNUSED_DUMMY(unusable)
       primary_number=0
       derived_number=0
       rule => this%rule_map%at(trim(item_name))

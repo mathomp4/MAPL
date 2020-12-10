@@ -14,43 +14,79 @@ module MAPL_ExtDataDerived
       character(:), allocatable :: refresh_template !temporary to get working
       contains
          procedure :: display
+         procedure :: append_from_yaml
+         procedure :: set_defaults
    end type
-
-   interface ExtDataDerived
-      module procedure new_ExtDataDerived_from_yaml
-   end interface
 
 contains
 
-   function new_ExtDataDerived_from_yaml(config,unusable,rc) result(rule)
-      type(Configuration), intent(in) :: config
+   subroutine set_defaults(this,unusable,rc)
+      class(ExtDataDerived), intent(inout), target :: this
       class(KeywordEnforcer), optional, intent(in) :: unusable
       integer, optional, intent(out) :: rc
 
-      type(ExtDataDerived), target :: rule
+      integer :: status
+      _UNUSED_DUMMY(unusable)
+      this%expression=''
+      this%refresh_time='0'
+      this%refresh_frequency='PT0S'
+      this%refresh_offset='PT0S'
+      _RETURN(_SUCCESS)
+   end subroutine set_defaults
+
+   recursive  subroutine append_from_yaml(rule,config,key,unusable,rc)
+      class(ExtDataDerived), intent(inout), target :: rule
+      type(Configuration), intent(in) :: config
+      character(len=*), intent(in) :: key
+      class(KeywordEnforcer), optional, intent(in) :: unusable
+      integer, optional, intent(out) :: rc
+
       logical :: is_present
       integer :: status
-    
+      character(len=:), allocatable :: source_str
+      integer :: idx
+      type(Configuration) :: subcfg
+      character(len=:), allocatable :: override_key, tempc
+      logical :: templ
+      real :: tempr
       _UNUSED_DUMMY(unusable)
 
-      call config%get(rule%expression,"function",default='',is_present=is_present,rc=status)
-      _VERIFY(status)
-      _ASSERT(is_present,"Missing function in ExtDataDerived")
+      idx=index(key,"%")
+      if (idx == 0) then
+         subcfg=config%at(trim(key))
+      else
+         subcfg=config%at(trim(key(:idx-1)),trim(key(idx+1:)))
+      end if
 
-      call config%get(rule%refresh_time,"update_reff_time",default='',rc=status)
+      call subcfg%get(override_key,"opts",default='',rc=status)
       _VERIFY(status)
+      if (override_key/='') then
+         call rule%append_from_yaml(config,override_key,rc=status)
+         _VERIFY(status)
+      end if
 
-      call config%get(rule%refresh_frequency,"update_frequency",default='PT0S',rc=status)
+      if (allocated(tempc)) deallocate(tempc)
+      call subcfg%get(tempc,"function",is_present=is_present,rc=status)
       _VERIFY(status)
+      if (is_present) rule%expression=tempc
 
-      call config%get(rule%refresh_offset,"update_offset",default='PT0S',rc=status)
+      if (allocated(tempc)) deallocate(tempc)
+      call subcfg%get(tempc,"upd_ref_time",is_present=is_present,rc=status)
       _VERIFY(status)
+      if (is_present) rule%refresh_time=tempc
 
-      call config%get(rule%refresh_template,"refresh_template",default='0',rc=status)
+      if (allocated(tempc)) deallocate(tempc)
+      call subcfg%get(tempc,"upd_freq",is_present=is_present,rc=status)
       _VERIFY(status)
+      if (is_present) rule%refresh_frequency=tempc
+
+      if (allocated(tempc)) deallocate(tempc)
+      call subcfg%get(tempc,"upd_offset",is_present=is_present,rc=status)
+      _VERIFY(status)
+      if (is_present) rule%refresh_offset=tempc
 
       _RETURN(_SUCCESS)
-   end function new_ExtDataDerived_from_yaml
+   end subroutine append_from_yaml
 
    subroutine display(this)
       class(ExtDataDerived) :: this

@@ -69,6 +69,7 @@ module MAPL_ExtDataOldTypesCreator
       integer :: status, semi_pos
       logical :: disable_interpolation
 
+      _UNUSED_DUMMY(unusable)
       rule => this%rule_map%at(trim(item_name))
       primary_item%isVector = allocated(rule%vector_partner)
       ! name and file var
@@ -94,8 +95,6 @@ module MAPL_ExtDataOldTypesCreator
       
       ! units
       primary_item%units = ''
-      ! climatology
-      !primary_item%cyclic = 'n' !ESMF_UtilStringLowerCase(trim(rule%climatology))
       ! regrid method
       if (trim(rule%regrid_method) == "BILINEAR") then
          primary_item%trans = REGRID_METHOD_BILINEAR
@@ -175,6 +174,7 @@ module MAPL_ExtDataOldTypesCreator
       type(ExtDataDerived), pointer :: rule
       integer :: status
 
+      _UNUSED_DUMMY(unusable)
       rule => this%derived_map%at(trim(item_name))
       derived_item%name = trim(item_name)
       derived_item%expression = rule%expression
