@@ -1181,22 +1181,6 @@ CONTAINS
 
      end subroutine GetLevs
 
-     subroutine makeMetadata(file,collection_id,metadata,rc)
-        character(len=*), intent(in   ) :: file
-        integer, intent(in)                       :: collection_id
-        type(FileMetadataUtils), pointer, intent(inout)   :: metadata
-        integer, optional,          intent(out  ) :: rc
-        type(MAPLExtDataCollection), pointer :: collection => null()
-
-        Collection => ExtDataCollections%at(collection_id)
-        metadata => collection%find(file)
-        If (Mapl_Am_I_Root().and.(Ext_Debug > 0)) Then
-           Write(6,'(a,a)') ' DEBUG: Retrieving formatter for: ', Trim(file)
-        End If
-        _RETURN(_SUCCESS)
-
-     end subroutine makeMetadata
-
  subroutine CalcDerivedField(state,exportName,exportExpr,masking,rc)
      type(ESMF_State),        intent(inout) :: state
      character(len=*),        intent(in   ) :: exportName     
