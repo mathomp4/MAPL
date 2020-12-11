@@ -56,6 +56,7 @@
    use MAPL_StringTemplate
    use pflogger, only: logging, Logger
    use MAPL_ExtDataLogger
+   use MAPL_ExtDataConstants
 
    IMPLICIT NONE
    PRIVATE
@@ -74,14 +75,8 @@
 !-------------------------------------------------------------------------
 
   integer                    :: Ext_Debug
-  character(len=ESMF_MAXSTR) :: Ext_TilePath
   integer, parameter         :: MAPL_ExtDataLeft          = 1
   integer, parameter         :: MAPL_ExtDataRight         = 2
-  integer, parameter         :: Null_Type         = 0
-  integer, parameter         :: Primary_Type_Scalar = 1
-  integer, parameter         :: Primary_Type_Vector_comp1 = 2
-  integer, parameter         :: Primary_Type_Vector_comp2 = 3
-  integer, parameter         :: Derived_TYpe      = 4
   logical                    :: hasRun
   character(len=ESMF_MAXSTR) :: error_msg_str
 
@@ -395,24 +390,15 @@ CONTAINS
    primaryitemcount=0
    deriveditemcount=0
    allocate(item_types(size(itemnames)),__STAT__)
-   item_types=Null_Type
    do i=1,size(itemnames)
-      found_in_config = config_yaml%name_in_config(trim(itemnames(i)))
+      item_types(i) = config_yaml%get_item_type(trim(itemnames(i)),rc=status)
+      _VERIFY(status)
+      found_in_config = (item_types(i)/= ExtData_not_found)
       if (.not.found_in_config) call unsatisfied_imports%push_back(itemnames(i))
-      call config_yaml%count_number(trim(itemnames(i)),num_primary,num_derived)
-      deriveditemcount=deriveditemcount+num_derived
-      if (num_derived ==0 .and. found_in_config) then
-         if (num_primary == 1) then 
-            item_types(i)=Primary_Type_Scalar
-            primaryitemcount=primaryitemcount+1
-         else if (num_primary == 2) then
-            item_types(i)=Primary_Type_Vector_comp1
-            primaryitemcount=primaryitemcount+1
-         else if (num_primary == 0) then
-            item_types(i)=Primary_Type_Vector_comp2
-         end if
-      else if (num_derived /=0 .and. found_in_config) then
-         item_types(i)=Derived_Type
+      if (item_types(i) == derived_type) then
+         deriveditemcount=deriveditemcount+num_derived
+      else
+         primaryitemcount=primaryitemcount+1
       end if
    enddo
    if (unsatisfied_imports%size() > 0) then

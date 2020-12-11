@@ -16,6 +16,7 @@ set (srcs
      ExtDataSimpleFileHandler.F90
      ExtDataNode.F90
      ExtDataLgr.F90
+     ExtDataConstants.F90
     )
 
 esma_add_library (${this} SRCS ${srcs} DEPENDENCIES MAPL.shared MAPL.base)

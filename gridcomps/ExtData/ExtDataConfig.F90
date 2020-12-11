@@ -11,6 +11,7 @@ module MAPL_ExtDataConfig
    use MAPL_ExtDataRuleMap
    use MAPL_ExtDataDerived
    use MAPL_ExtDataDerivedMap
+   use MAPL_ExtDataConstants
    implicit none
    private
 
@@ -21,8 +22,7 @@ module MAPL_ExtDataConfig
       type(ExtDataFileStreamMap) :: file_stream_map
       
       contains
-         procedure :: name_in_config
-         procedure :: count_number
+         procedure :: get_item_type
          procedure :: get_debug_flag
          procedure :: new_ExtDataConfig_from_yaml
    end type
@@ -118,60 +118,35 @@ contains
       _RETURN(_SUCCESS)
    end subroutine new_ExtDataConfig_from_yaml
 
-   logical function name_in_config(this,item_name,unusable,rc)
+   function get_item_type(this,item_name,unusable,rc) result(item_type)
       class(ExtDataConfig), intent(inout) :: this
       character(len=*), intent(in) :: item_name
       class(KeywordEnforcer), optional, intent(in) :: unusable
       integer, optional, intent(out) :: rc
-
+      integer :: item_type
       type(ExtDataRule), pointer :: rule
       type(ExtDataDerived), pointer :: derived
 
       _UNUSED_DUMMY(unusable)
-      rule => this%rule_map%at(trim(item_name))
-      if (associated(rule)) then
-         name_in_config = .true.
-         _RETURN(_SUCCESS)
-      end if
-      derived => this%derived_map%at(trim(item_name))
-      if (associated(derived)) then
-         name_in_config = .true.
-         _RETURN(_SUCCESS)
-      end if
-      name_in_config = .false.
-      _RETURN(_SUCCESS)
-   end function name_in_config
-
-   subroutine count_number(this, item_name,primary_number,derived_number,unusable,rc) 
-      class(ExtDataConfig), intent(inout) :: this
-      integer, intent(out) :: primary_number,derived_number
-      character(len=*), intent(in) :: item_name
-      class(KeywordEnforcer), optional, intent(in) :: unusable
-      integer, optional, intent(out) :: rc
-      type(ExtDataRule), pointer :: rule
-      type(ExtDataDerived), pointer :: derived
-
-      _UNUSED_DUMMY(unusable)
-      primary_number=0
-      derived_number=0
+      item_type=ExtData_not_found
       rule => this%rule_map%at(trim(item_name))
       if (associated(rule)) then
          if (allocated(rule%vector_component)) then
             if (rule%vector_component=='EW') then
-               primary_number=2
+               item_type=Primary_Type_Vector_comp2
             else if (rule%vector_component=='NS') then
-               primary_number=0
+               item_type=Primary_Type_Vector_comp1
             end if
          else
-            primary_number=1
+            item_type=Primary_Type_scalar
          end if
       end if
       derived => this%derived_map%at(trim(item_name))
       if (associated(derived)) then
-         derived_number = 1
+         item_type=derived_type
       end if
       _RETURN(_SUCCESS)
-   end subroutine count_number
+   end function get_item_type
  
    integer function get_debug_flag(this)
       class(ExtDataConfig), intent(inout) :: this
