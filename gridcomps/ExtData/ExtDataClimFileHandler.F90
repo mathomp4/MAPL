@@ -14,6 +14,7 @@ module MAPL_ExtdataClimFileHandler
    use MAPL_TimeStringConversion
    use MAPL_StringTemplate
    use MAPL_ExtDataBracket
+   use MAPL_ExtDataConstants
    implicit none
    private
    public ExtDataClimFileHandler
@@ -97,6 +98,7 @@ contains
          if (this%frequency == zero) then
             file = this%file_template
             call this%get_time_on_file(file,input_time,'L',time_index,time,__RC__)
+            _ASSERT(time_index/=time_not_found,"Time not found on file")
             call bracket%set_node('L',file=file,time_index=time_index,time=time,__RC__)
             if (bracket%left_node == bracket%right_node) then
                call bracket%swap_node_fields(rc=status)
@@ -105,14 +107,16 @@ contains
                bracket%new_file_left=.true.
             end if
             call this%get_time_on_file(file,input_time,'R',time_index,time,__RC__)
+            _ASSERT(time_index/=time_not_found,"Time not found on file")
             call bracket%set_node('R',file=file,time_index=time_index,time=time,__RC__)
             bracket%new_file_right=.true.
          else
             call this%get_file(file,target_time,0,__RC__)
             call this%get_time_on_file(file,target_time,'L',time_index,time,rc=status)
-            if (status /=  _SUCCESS) then
+            if (time_index == time_not_found) then
                call this%get_file(file,target_time,-1,__RC__)
                call this%get_time_on_file(file,target_time,'L',time_index,time,__RC__)
+               _ASSERT(time_index/=time_not_found,"Time not found on file")
             end if
             call bracket%set_node('L',file=file,time_index=time_index,time=time,__RC__)
             if (bracket%left_node == bracket%right_node) then
@@ -124,9 +128,10 @@ contains
 
             call this%get_file(file,target_time,0,__RC__)
             call this%get_time_on_file(file,target_time,'R',time_index,time,rc=status)
-            if (status /=  _SUCCESS) then
+            if (time_index == time_not_found) then
                call this%get_file(file,target_time,1,__RC__)
                call this%get_time_on_file(file,target_time,'R',time_index,time,__RC__)
+               _ASSERT(time_index/=time_not_found,"Time not found on file")
             end if
             call bracket%set_node('R',file=file,time_index=time_index,time=time,__RC__)
             bracket%new_file_right=.true.
@@ -142,6 +147,7 @@ contains
             file = this%file_template
             clim_shift=0
             call this%get_time_on_file(file,target_time,'L',time_index,time,wrap=clim_shift,__RC__)
+            _ASSERT(time_index/=time_not_found,"Time not found on file")
             call swap_year(time,original_year+clim_shift,__RC__)
             call bracket%set_node('L',file=file,time_index=time_index,time=time,__RC__)
             if (bracket%left_node == bracket%right_node) then
@@ -153,6 +159,7 @@ contains
 
             clim_shift=0
             call this%get_time_on_file(file,target_time,'R',time_index,time,wrap=clim_shift,__RC__)
+            _ASSERT(time_index/=time_not_found,"Time not found on file")
             call swap_year(time,original_year+clim_shift,__RC__)
             call bracket%set_node('R',file=file,time_index=time_index,time=time,__RC__)
             bracket%new_file_right=.true.
@@ -161,9 +168,10 @@ contains
 
             call this%get_file(file,target_time,0,__RC__)
             call this%get_time_on_file(file,target_time,'L',time_index,time,rc=status)
-            if (status /=  _SUCCESS) then
+            if (time_index == time_not_found) then
                call this%get_file(file,target_time,-1,__RC__)
                call this%get_time_on_file(file,target_time,'L',time_index,time,__RC__)
+               _ASSERT(time_index/=time_not_found,"Time not found on file")
                call ESMF_TimeGet(target_time,yy=target_year,__RC__)
                if (target_year > this%clim_year) then
                   call swap_year(time,original_year-1,__RC__)
@@ -183,9 +191,10 @@ contains
 
             call this%get_file(file,target_time,0,__RC__)
             call this%get_time_on_file(file,target_time,'R',time_index,time,rc=status)
-            if (status /=  _SUCCESS) then
+            if (time_index == time_not_found) then
                call this%get_file(file,target_time,1,__RC__)
                call this%get_time_on_file(file,target_time,'R',time_index,time,__RC__)
+               _ASSERT(time_index/=time_not_found,"Time not found on file")
                call ESMF_TimeGet(target_time,yy=target_year,__RC__)
                if (target_year < this%clim_year) then
                   call swap_year(time,original_year+1,__RC__)

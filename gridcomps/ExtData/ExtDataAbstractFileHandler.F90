@@ -1,5 +1,6 @@
 #include "MAPL_Exceptions.h"
 #include "MAPL_ErrLog.h"
+#include "unused_dummy.H"
 module MAPL_ExtdataAbstractFileHandler
    use ESMF
    use yafYaml
@@ -10,6 +11,7 @@ module MAPL_ExtdataAbstractFileHandler
    use MAPL_ExtDataFileStreamMap
    use MAPL_ExtDataCollectionMod
    use MAPL_CollectionVectorMod
+   use MAPL_ExtDataConstants
    use MAPL_ExtDataCollectionManagerMod
    use MAPL_FileMetadataUtilsMod
    use MAPL_TimeStringConversion
@@ -45,8 +47,7 @@ module MAPL_ExtdataAbstractFileHandler
       end subroutine get_file_bracket
 
    end interface
-         
-
+   
 contains
 
    subroutine initialize(this,file_series,persist_closest,unusable,rc)
@@ -73,13 +74,14 @@ contains
 
    end subroutine initialize
 
-   subroutine get_time_on_file(this,filename,target_time,bracketside,time_index,output_time,wrap,rc)
+   subroutine get_time_on_file(this,filename,target_time,bracketside,time_index,output_time,unusable,wrap,rc)
       class(ExtdataAbstractFileHandler), intent(inout) :: this
       character(len=*), intent(inout) :: filename
       type(ESMF_Time), intent(in) :: target_time
       character(len=*), intent(in) :: bracketside
       integer, intent(Out) :: time_index
       type(ESMF_Time), intent(out) :: output_time
+      class (KeywordEnforcer), optional, intent(out) :: unusable
       integer, optional, intent(inout) :: wrap
       integer, optional, intent(out) :: rc
       integer :: status
@@ -89,11 +91,13 @@ contains
       logical :: in_bounds, found_time, wrap_
       integer :: i,num_times
     
+      _UNUSED_DUMMY(unusable)
       if (present(wrap)) then
          wrap_= .true.
       else
          wrap_=.false.
       end if
+      time_index=time_not_found
 
       call this%make_metadata(filename,file_metadata,__RC__) 
       call file_metadata%get_time_info(timeVector=time_series,__RC__)
@@ -141,12 +145,7 @@ contains
          _ASSERT(.false.,"unknown bracket side")
       end if
 
-      !if (found_time .and. in_bounds) then
-      if (found_time) then
-         _RETURN(_SUCCESS)
-      else
-         _RETURN(_FAILURE)
-      end if 
+      _RETURN(_SUCCESS)
 
    end subroutine get_time_on_file
 

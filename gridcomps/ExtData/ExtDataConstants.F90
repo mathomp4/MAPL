@@ -7,6 +7,6 @@ private
   integer, parameter, public    :: Primary_Type_Vector_comp1 = 2
   integer, parameter, public    :: Primary_Type_Vector_comp2 = 3
   integer, parameter, public    :: Derived_TYpe      = 4
-
+  integer, parameter, public    :: time_not_found = -1
 
 end module MAPL_ExtDataConstants
