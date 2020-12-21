@@ -33,7 +33,6 @@
    use MAPL_NewArthParserMod
    use MAPL_ConstantsMod, only: MAPL_PI,MAPL_PI_R8,MAPL_RADIANS_TO_DEGREES
    use MAPL_IOMod, only: MAPL_NCIOParseTimeUnits
-   use MAPL_regridderSpecMod
    use, intrinsic :: iso_fortran_env, only: REAL64
    use linearVerticalInterpolation_mod
    use ESMF_CFIOCollectionVectorMod

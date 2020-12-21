@@ -15,7 +15,7 @@ module MAPL_ExtDataOldTypesCreator
    use MAPL_ExtDataRuleMap
    use MAPL_ExtDataDerived
    use MAPL_ExtDataDerivedMap
-   use MAPL_RegridderSpecMod
+   use MAPL_RegridMethods
    use MAPL_ExtDataAbstractFileHandler
    use MAPL_ExtDataSimpleFileHandler
    use MAPL_ExtDataClimFileHandler
