@@ -3415,11 +3415,11 @@ ENDDO PARSER
    call MAPL_TimerOn(GENSTATE,"----IO Create")
 
 
-   call o_Clients%seek(-pre_nwriting)
-   do n = 1, pre_nWriting
-      call o_Clients%wait() 
-      call o_Clients%next()
-   enddo
+  ! call o_Clients%seek(-pre_nwriting)
+  ! do n = 1, pre_nWriting
+  !    call o_Clients%wait() 
+  !    call o_Clients%next()
+  ! enddo
 
    ! WY note: need to make sure it remembers the pre pool and rewind
    ! if (any(writing)) call o_Clients%set_optimal_server(count(writing))
@@ -3584,11 +3584,11 @@ ENDDO PARSER
 
    enddo POSTLOOP
 
-  ! call o_Clients%seek(-nWriting)
-  ! do n = 1, nWriting
-  !    call o_Clients%wait() 
-  !    call o_Clients%next()
-  ! enddo
+   call o_Clients%seek(-nWriting)
+   do n = 1, nWriting
+      call o_Clients%wait() 
+      call o_Clients%next()
+   enddo
 
    call MAPL_TimerOff(GENSTATE,"-----IO Post")
    call MAPL_TimerOff(GENSTATE,"----IO Write")
