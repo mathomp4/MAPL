@@ -530,8 +530,8 @@ contains
     call ESMF_ConfigGetAttribute(config, value=IntState%serverSizeSplit, &
          label = 'ServerSizeSplit:', default=0, rc=status)
     _VERIFY(status)
-    call o_Clients%split_server_pools(n_server_split = IntState%serverSizeSplit, &
-                                      n_hist_split   = IntState%collectionWriteSplit,rc=status)
+    !call o_Clients%split_server_pools(n_server_split = IntState%serverSizeSplit, &
+    !                                  n_hist_split   = IntState%collectionWriteSplit,rc=status)
     _VERIFY(status)
 
     call ESMF_ConfigGetAttribute(config, value=INTSTATE%MarkDone,          &
@@ -3212,7 +3212,8 @@ ENDDO PARSER
     type(HistoryCollection),   pointer  :: list(:)
     type(HISTORY_STATE),  pointer  :: IntState
     type(HISTORY_wrap)             :: wrap
-    integer                        :: nlist
+    integer                        :: nlist, nwriting
+    integer, save                  :: pre_nwriting = 0
     character(len=ESMF_MAXSTR)     :: fntmpl
     character(len=ESMF_MAXSTR),pointer     :: filename(:)
     integer                        :: n,m
@@ -3413,162 +3414,181 @@ ENDDO PARSER
 
    call MAPL_TimerOn(GENSTATE,"----IO Create")
 
-   if (any(writing)) call o_Clients%set_optimal_server(count(writing))
+
+   call o_Clients%seek(-pre_nwriting)
+   do n = 1, pre_nWriting
+      call o_Clients%wait() 
+      call o_Clients%next()
+   enddo
+
+   ! WY note: need to make sure it remembers the pre pool and rewind
+   ! if (any(writing)) call o_Clients%set_optimal_server(count(writing))
+
+   nwriting = 0
 
    OPENLOOP: do n=1,nlist
-      if( Writing(n) ) then
 
-         call get_DateStamp ( clock, DateStamp=DateStamp,  &
-              OFFSET = INTSTATE%STAMPOFFSET(n),            &
-                                                 rc=status )
-         _VERIFY(STATUS)
+      if( .not. Writing(n) ) cycle
 
-         if (trim(INTSTATE%expid) == "") then
-            fntmpl =          trim(list(n)%filename)
-         else
-            fntmpl = "%s." // trim(list(n)%filename)
-         endif
+      call get_DateStamp ( clock, DateStamp=DateStamp,  &
+           OFFSET = INTSTATE%STAMPOFFSET(n),            &
+                                              rc=status )
+      _VERIFY(STATUS)
 
-         if (trim(list(n)%template) /= "") then
-            fntmpl = trim(fntmpl) // "." //trim(list(n)%template)
-         endif
+      if (trim(INTSTATE%expid) == "") then
+         fntmpl =          trim(list(n)%filename)
+      else
+         fntmpl = "%s." // trim(list(n)%filename)
+      endif
 
-         read(DateStamp( 1: 8),'(i8.8)') nymd
-         read(DateStamp(10:15),'(i6.6)') nhms
+      if (trim(list(n)%template) /= "") then
+         fntmpl = trim(fntmpl) // "." //trim(list(n)%template)
+      endif
 
-         call fill_grads_template ( filename(n), fntmpl, &
-              experiment_id=trim(INTSTATE%expid), &
-              nymd=nymd, nhms=nhms, rc=status ) ! here is where we get the actual filename of file we will write
-         _VERIFY(STATUS)
+      read(DateStamp( 1: 8),'(i8.8)') nymd
+      read(DateStamp(10:15),'(i6.6)') nhms
 
-         if(list(n)%monthly .and. list(n)%partial) then
-            filename(n)=trim(filename(n)) // '-partial'
+      call fill_grads_template ( filename(n), fntmpl, &
+           experiment_id=trim(INTSTATE%expid), &
+           nymd=nymd, nhms=nhms, rc=status ) ! here is where we get the actual filename of file we will write
+      _VERIFY(STATUS)
+
+      if(list(n)%monthly .and. list(n)%partial) then
+         filename(n)=trim(filename(n)) // '-partial'
+         list(n)%currentFile = filename(n)
+      end if
+
+      if( NewSeg) then 
+         list(n)%partial = .false.
+      endif
+
+      if (list(n)%timeseries_output) then
+         if (list(n)%unit.eq.0) then
+            if (mapl_am_i_root()) write(6,*)"Sampling to new file: ",trim(filename(n))
+            call list(n)%trajectory%close_file_handle(rc=status)
+            _VERIFY(status)
+            call list(n)%trajectory%create_file_handle(filename(n),rc=status) 
+            _VERIFY(status)
             list(n)%currentFile = filename(n)
+            list(n)%unit = -1
          end if
-
-         if( NewSeg) then 
-            list(n)%partial = .false.
-         endif
-
-         if (list(n)%timeseries_output) then
-            if (list(n)%unit.eq.0) then
-               if (mapl_am_i_root()) write(6,*)"Sampling to new file: ",trim(filename(n))
-               call list(n)%trajectory%close_file_handle(rc=status)
+         list(n)%currentFile = filename(n)
+      else
+         if( list(n)%unit.eq.0 ) then
+            if (list(n)%format == 'CFIO') then
+               call o_Clients%wait()
+               call list(n)%mNewCFIO%modifyTime(oClients=o_Clients,rc=status)
                _VERIFY(status)
-               call list(n)%trajectory%create_file_handle(filename(n),rc=status) 
-               _VERIFY(status)
+               call o_Clients%next()
+               nwriting = nwriting + 1
                list(n)%currentFile = filename(n)
                list(n)%unit = -1
-            end if
-            list(n)%currentFile = filename(n)
-         else
-            if( list(n)%unit.eq.0 ) then
-               if (list(n)%format == 'CFIO') then
-                  call list(n)%mNewCFIO%modifyTime(oClients=o_Clients,rc=status)
-                  _VERIFY(status)
-                  list(n)%currentFile = filename(n)
-                  list(n)%unit = -1
-               else
-                  list(n)%unit = GETFILE( trim(filename(n)),all_pes=.true.)
-               end if
+            else
+               list(n)%unit = GETFILE( trim(filename(n)),all_pes=.true.)
             end if
          end if
-
-         if(  MAPL_AM_I_ROOT() ) then
-              if (index(list(n)%format,'flat') == 0 .and. (.not.list(n)%timeseries_output)) &
-              write(6,'(1X,"Writing: ",i6," Slices to File:  ",a)') &
-                    list(n)%slices,trim(list(n)%currentFile)
-         endif
-
       end if
+
+      if(  MAPL_AM_I_ROOT() ) then
+           if (index(list(n)%format,'flat') == 0 .and. (.not.list(n)%timeseries_output)) &
+           write(6,'(1X,"Writing: ",i6," Slices to File:  ",a)') &
+                 list(n)%slices,trim(list(n)%currentFile)
+      endif
 !
    enddo OPENLOOP
+   pre_nwriting = nwriting
+   !set to the begining 
+   call o_Clients%seek(-nwriting)
    call MAPL_TimerOff(GENSTATE,"----IO Create")
 
    call MAPL_TimerOn(GENSTATE,"----IO Write")
    call MAPL_TimerOn(GENSTATE,"-----IO Post")
+
    POSTLOOP: do n=1,nlist
 
-      OUTTIME: if( Writing(n) ) then
+      if (.not. Writing(n)) cycle
 
-         if (associated(IntState%Regrid(n)%PTR)) then
-            state_out = INTSTATE%REGRID(n)%PTR%state_out
+      if (associated(IntState%Regrid(n)%PTR)) then
+         state_out = INTSTATE%REGRID(n)%PTR%state_out
 
-            if (.not. IntState%Regrid(n)%PTR%ontiles) then
-               if (IntState%Regrid(n)%PTR%regridType == MAPL_T2G2G) then
-                  call RegridTransformT2G2G(IntState%GIM(n), &
-                       IntState%Regrid(n)%PTR%xform, &
-                       IntState%Regrid(n)%PTR%xformNtv, &
-                       state_out, &
-                       IntState%Regrid(n)%PTR%LocIn, &
-                       IntState%Regrid(n)%PTR%LocOut, &
-                       IntState%Regrid(n)%PTR%LocNative, &
-                       IntState%Regrid(n)%PTR%ntiles_in, &
-                       IntState%Regrid(n)%PTR%ntiles_out,&
-                       rc=status)
-               else
-                  call RegridTransform(IntState%GIM(n), &
-                       IntState%Regrid(n)%PTR%xform, &
-                       state_out, &
-                       IntState%Regrid(n)%PTR%LocIn, &
-                       IntState%Regrid(n)%PTR%LocOut, &
-                       IntState%Regrid(n)%PTR%ntiles_in, &
-                       IntState%Regrid(n)%PTR%ntiles_out,&
-                       rc=status)
-               end if
+         if (.not. IntState%Regrid(n)%PTR%ontiles) then
+            if (IntState%Regrid(n)%PTR%regridType == MAPL_T2G2G) then
+               call RegridTransformT2G2G(IntState%GIM(n), &
+                    IntState%Regrid(n)%PTR%xform, &
+                    IntState%Regrid(n)%PTR%xformNtv, &
+                    state_out, &
+                    IntState%Regrid(n)%PTR%LocIn, &
+                    IntState%Regrid(n)%PTR%LocOut, &
+                    IntState%Regrid(n)%PTR%LocNative, &
+                    IntState%Regrid(n)%PTR%ntiles_in, &
+                    IntState%Regrid(n)%PTR%ntiles_out,&
+                    rc=status)
             else
-               if (IntState%Regrid(n)%PTR%noxform) then
-                  call RegridTransformT2G(STATE_IN=IntState%GIM(n), &
-                       STATE_OUT=state_out, &
-                       LS_OUT=IntState%Regrid(n)%PTR%LocOut, &
-                       NTILES_OUT=IntState%Regrid(n)%PTR%ntiles_out, &
-                       rc=status)
-               else
-                  call RegridTransformT2G(STATE_IN=IntState%GIM(n), &
-                       XFORM=IntState%Regrid(n)%PTR%xform, &
-                       STATE_OUT=state_out, &
-                       LS_OUT=IntState%Regrid(n)%PTR%LocOut, &
-                       NTILES_OUT=IntState%Regrid(n)%PTR%ntiles_out, &
-                       rc=status)
-               end if
+               call RegridTransform(IntState%GIM(n), &
+                    IntState%Regrid(n)%PTR%xform, &
+                    state_out, &
+                    IntState%Regrid(n)%PTR%LocIn, &
+                    IntState%Regrid(n)%PTR%LocOut, &
+                    IntState%Regrid(n)%PTR%ntiles_in, &
+                    IntState%Regrid(n)%PTR%ntiles_out,&
+                    rc=status)
             end if
-            _VERIFY(STATUS)
          else
-            state_out = INTSTATE%GIM(n)
-         end if
-
-         if (.not.list(n)%timeseries_output) then
-            IOTYPE: if (list(n)%unit < 0) then    ! CFIO
-
-               call list(n)%mNewCFIO%bundlepost(list(n)%currentFile,oClients=o_Clients,rc=status)
-               _VERIFY(status)
-
+            if (IntState%Regrid(n)%PTR%noxform) then
+               call RegridTransformT2G(STATE_IN=IntState%GIM(n), &
+                    STATE_OUT=state_out, &
+                    LS_OUT=IntState%Regrid(n)%PTR%LocOut, &
+                    NTILES_OUT=IntState%Regrid(n)%PTR%ntiles_out, &
+                    rc=status)
             else
-
-               if( INTSTATE%LCTL(n) ) then
-                  call MAPL_GradsCtlWrite ( clock, state_out, list(n), &
-                       filename(n), INTSTATE%expid, &
-                       list(n)%descr, intstate%output_grids,rc )
-                  INTSTATE%LCTL(n) = .false.
-               endif
-
-               do m=1,list(n)%field_set%nfields
-                  call MAPL_VarWrite ( list(n)%unit, STATE=state_out, &
-                       NAME=trim(list(n)%field_set%fields(3,m)), &
-                       forceWriteNoRestart=.true., rc=status )
-                  _VERIFY(STATUS)
-               enddo
-               call WRITE_PARALLEL("Wrote GrADS Output for File: "//trim(filename(n)))
-
-            end if IOTYPE
+               call RegridTransformT2G(STATE_IN=IntState%GIM(n), &
+                    XFORM=IntState%Regrid(n)%PTR%xform, &
+                    STATE_OUT=state_out, &
+                    LS_OUT=IntState%Regrid(n)%PTR%LocOut, &
+                    NTILES_OUT=IntState%Regrid(n)%PTR%ntiles_out, &
+                    rc=status)
+            end if
          end if
+         _VERIFY(STATUS)
+      else
+         state_out = INTSTATE%GIM(n)
+      end if
 
-      endif OUTTIME
+      if (.not.list(n)%timeseries_output) then
+         IOTYPE: if (list(n)%unit < 0) then    ! CFIO
+
+            call list(n)%mNewCFIO%bundlepost(list(n)%currentFile,oClients=o_Clients,rc=status)
+            _VERIFY(status)
+            call o_Clients%done_collective_stage()
+            call o_Clients%next()
+
+         else
+
+            if( INTSTATE%LCTL(n) ) then
+               call MAPL_GradsCtlWrite ( clock, state_out, list(n), &
+                    filename(n), INTSTATE%expid, &
+                    list(n)%descr, intstate%output_grids,rc )
+               INTSTATE%LCTL(n) = .false.
+            endif
+
+            do m=1,list(n)%field_set%nfields
+               call MAPL_VarWrite ( list(n)%unit, STATE=state_out, &
+                    NAME=trim(list(n)%field_set%fields(3,m)), &
+                    forceWriteNoRestart=.true., rc=status )
+               _VERIFY(STATUS)
+            enddo
+            call WRITE_PARALLEL("Wrote GrADS Output for File: "//trim(filename(n)))
+
+         end if IOTYPE
+      end if
 
    enddo POSTLOOP
 
-   call o_Clients%done_collective_stage()
-   call o_Clients%wait() 
+  ! call o_Clients%seek(-nWriting)
+  ! do n = 1, nWriting
+  !    call o_Clients%wait() 
+  !    call o_Clients%next()
+  ! enddo
 
    call MAPL_TimerOff(GENSTATE,"-----IO Post")
    call MAPL_TimerOff(GENSTATE,"----IO Write")
@@ -3663,6 +3683,13 @@ ENDDO PARSER
     IntState => wrap%ptr
     list => IntState%list
     nlist = size(list)
+
+! clean up all history data
+
+  do n = 1, o_Clients%size()
+      call o_Clients%wait() 
+      call o_Clients%next()
+  enddo
 
 ! Close UNITs of GEOSgcm History Data
 ! -----------------------------------

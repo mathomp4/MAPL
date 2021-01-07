@@ -8403,7 +8403,7 @@ module MAPL_IOMod
 
        if (arrdes%write_restart_by_oserver) then
           _ASSERT(present(oClients), 'output server is needed')
-          call oClients%set_optimal_server(1)
+          !call oClients%set_optimal_server(1)
           iter = RstCollections%find(trim(BundleName))
           if (iter == RstCollections%end()) then
              arrdes%collection_id = oClients%add_hist_collection(cf)
@@ -8470,6 +8470,7 @@ module MAPL_IOMod
        call oClients%wait()
        call MPI_Info_free(info, status)
        _VERIFY(STATUS)
+       call oClients%next()
     elseif (arrdes%writers_comm/=MPI_COMM_NULL) then
        call formatter%close()
        _VERIFY(STATUS)

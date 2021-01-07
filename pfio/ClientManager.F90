@@ -60,6 +60,7 @@ module pFIO_ClientManagerMod
       procedure :: set_optimal_server
       procedure :: split_server_pools
       procedure :: set_server_size
+      procedure :: seek
    end type
 
    interface ClientManager
@@ -407,6 +408,26 @@ contains
       if (this%current_client > this%clients%size()) this%current_client = 1
    end subroutine next
 
+   subroutine seek(this, n, rc)
+      class (ClientManager), target,intent(inout) :: this
+      integer, intent(in) :: n
+      integer, optional, intent(out) :: rc
+      integer :: k, step
+
+      if (n == 0) then
+         _RETURN(_SUCCESS)
+      endif
+
+      step = abs(n)/n
+      do k = 1, abs(n)
+         this%current_client = this%current_client + step 
+         if (this%current_client > this%clients%size()) this%current_client = 1
+         if (this%current_client < 1) this%current_client = this%clients%size()
+      enddo
+
+      _RETURN(_SUCCESS)
+   end subroutine seek
+
    subroutine set_current(this, ith, rc) 
       class (ClientManager), intent(inout) :: this
       integer, optional, intent(in) :: ith
@@ -443,7 +464,6 @@ contains
       tsize = this%server_sizes%size()
 
       if (ssize == 0) then
-         call this%next()
          _RETURN(_SUCCESS)
       endif
 
