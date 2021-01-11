@@ -86,9 +86,7 @@ contains
       end if
 
       if (present(nodes_output_server)) then
-         n_oserver_group = sum(nodes_output_server)
-         allocate(nodes_out(n_oserver_group),source = 1)
-         !nodes_out = nodes_output_server
+         nodes_out = nodes_output_server
       else
          nodes_out = [0]
       end if

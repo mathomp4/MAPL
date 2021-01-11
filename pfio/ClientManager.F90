@@ -33,6 +33,7 @@ module pFIO_ClientManagerMod
      integer :: writeCutoff
      integer :: large_total = 0
      integer :: small_total = 0
+     logical :: isSplit = .false.
    contains
       procedure :: add_ext_collection
       procedure :: add_hist_collection
@@ -61,6 +62,7 @@ module pFIO_ClientManagerMod
       procedure :: split_server_pools
       procedure :: set_server_size
       procedure :: seek
+      procedure :: isServerSplit
    end type
 
    interface ClientManager
@@ -529,12 +531,10 @@ contains
       integer :: pos
 
       tsize = this%server_sizes%size()
+      ! if there is ony one o-server, no split necessary
       if (tsize == 1) then
         _RETURN(_SUCCESS)
       endif
-
-      nsplit = 0
-      if (present(n_server_split)) nsplit = n_server_split
 
       allocate(server_sizes(tsize))
       allocate(tmp_position(tsize))
@@ -543,6 +543,14 @@ contains
          tmp_position(i) = i
       enddo
       call MAPL_Sort(server_sizes, tmp_position)
+
+      ! if all the server_sizes are the same, no split
+      if (all(server_sizes == server_sizes(1))) then
+         _RETURN(_SUCCESS)
+      endif   
+      !
+      nsplit = 0
+      if (present(n_server_split)) nsplit = n_server_split
       ! if nsplit is out of scope, pick the mid point
       if (nsplit < server_sizes(1) .or. nsplit > server_sizes(tsize)) then 
          pos = tsize/2
@@ -559,7 +567,8 @@ contains
 
       this%large_total = 0
       this%small_total = 0
-
+      print*, "small servers" , tmp_position(1:pos)
+      print*, "big servers" , tmp_position(pos+1:tsize)
       do i = 1, pos
          call this%small_server_pool%push_back(tmp_position(i))
          this%small_total = this%small_total + this%server_sizes%at(tmp_position(i))
@@ -572,6 +581,8 @@ contains
 
       this%writeCutoff = 0
       if (present(n_hist_split)) this%writeCutoff = n_hist_split
+
+      this%isSplit = .true.
 
       _RETURN(_SUCCESS)
       _UNUSED_DUMMY(unusable)
@@ -593,6 +604,12 @@ contains
       integer :: n_client
       n_client = this%clients%size()
    end function size
+
+   function isServerSplit(this) result(split) 
+      class (ClientManager), intent(in) :: this
+      logical :: split
+      split = this%isSplit
+   end function isServerSplit
 
    subroutine init_ClientManager(unusable, n_i, n_o, rc)
       class (KeywordEnforcer), optional, intent(out) :: unusable

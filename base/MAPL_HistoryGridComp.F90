@@ -530,8 +530,8 @@ contains
     call ESMF_ConfigGetAttribute(config, value=IntState%serverSizeSplit, &
          label = 'ServerSizeSplit:', default=0, rc=status)
     _VERIFY(status)
-    !call o_Clients%split_server_pools(n_server_split = IntState%serverSizeSplit, &
-    !                                  n_hist_split   = IntState%collectionWriteSplit,rc=status)
+    call o_Clients%split_server_pools(n_server_split = IntState%serverSizeSplit, &
+                                      n_hist_split   = IntState%collectionWriteSplit,rc=status)
     _VERIFY(status)
 
     call ESMF_ConfigGetAttribute(config, value=INTSTATE%MarkDone,          &
@@ -3476,11 +3476,17 @@ ENDDO PARSER
       else
          if( list(n)%unit.eq.0 ) then
             if (list(n)%format == 'CFIO') then
-               call o_Clients%wait()
+               if (.not. o_Clients%isServerSplit() .and. o_Clients%size() > 1) then
+                 call o_Clients%wait()
+               endif
                call list(n)%mNewCFIO%modifyTime(oClients=o_Clients,rc=status)
                _VERIFY(status)
-               call o_Clients%next()
-               nwriting = nwriting + 1
+               
+               if (.not. o_Clients%isServerSplit() .and. o_Clients%size() > 1) then
+                  call o_Clients%next()
+                  nwriting = nwriting + 1
+               endif
+
                list(n)%currentFile = filename(n)
                list(n)%unit = -1
             else
@@ -3496,8 +3502,8 @@ ENDDO PARSER
       endif
 !
    enddo OPENLOOP
+   ! if no split, nwrting == 0, no effect here
    pre_nwriting = nwriting
-   !set to the begining 
    call o_Clients%seek(-nwriting)
    call MAPL_TimerOff(GENSTATE,"----IO Create")
 
@@ -3556,11 +3562,17 @@ ENDDO PARSER
 
       if (.not.list(n)%timeseries_output) then
          IOTYPE: if (list(n)%unit < 0) then    ! CFIO
+            if (.not. o_Clients%isServerSplit() .and. o_Clients%size() > 1 ) then
+               call o_Clients%wait()
+            endif
 
             call list(n)%mNewCFIO%bundlepost(list(n)%currentFile,oClients=o_Clients,rc=status)
             _VERIFY(status)
-            call o_Clients%done_collective_stage()
-            call o_Clients%next()
+
+            if (.not. o_Clients%isServerSplit() .and. o_Clients%size() > 1 ) then
+               call o_Clients%done_collective_stage()
+               call o_Clients%next()
+            endif
 
          else
 
@@ -3585,10 +3597,15 @@ ENDDO PARSER
    enddo POSTLOOP
 
    call o_Clients%seek(-nWriting)
-   do n = 1, nWriting
-      call o_Clients%wait() 
-      call o_Clients%next()
-   enddo
+   if (.not. o_Clients%isServerSplit() .and. o_Clients%size() > 1 ) then
+      do n = 1, nWriting
+         call o_Clients%wait() 
+         call o_Clients%next()
+      enddo
+   else
+      call o_Clients%done_collective_stage()
+      call o_Clients%wait()
+   endif
 
    call MAPL_TimerOff(GENSTATE,"-----IO Post")
    call MAPL_TimerOff(GENSTATE,"----IO Write")
